@@ -1,5 +1,5 @@
-import { gameState, CONFIG } from '../game/gameState.js';
-import { ROUTE } from '../data/route.js';
+import { gameState, CONFIG } from '../game-engine/gameStateAndRules.js';
+import { ROUTE } from '../map-data/citiesAndRoute.js';
 
 // Interpolated SVG position of the SUV between the two route nodes it's between.
 function suvPos(miles) {
@@ -13,7 +13,7 @@ function suvPos(miles) {
   return { x: a.svgX + (b.svgX - a.svgX) * t, y: a.svgY + (b.svgY - a.svgY) * t };
 }
 
-export default function RouteMap({ onClose }) {
+export default function RouteMapScreen({ onClose }) {
   const g = gameState;
   const pos = suvPos(g.miles);
   const path = ROUTE.map((r, i) => `${i ? 'L' : 'M'} ${r.svgX} ${r.svgY}`).join(' ');

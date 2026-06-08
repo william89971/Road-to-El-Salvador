@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { DEV_MODE, gameState } from '../game/gameState.js';
+import { DEV_MODE, gameState } from '../game-engine/gameStateAndRules.js';
 
 const MOCK_EVENTS = [
   { headline: 'Radiator Blows in the Desert', dateline: 'HERMOSILLO HERALD — Day X',

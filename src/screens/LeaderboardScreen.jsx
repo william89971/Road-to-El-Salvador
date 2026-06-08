@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { topRuns } from '../game/leaderboard.js';
+import { topRuns } from '../game-engine/leaderboardStorage.js';
 
-export default function Leaderboard({ onClose }) {
+export default function LeaderboardScreen({ onClose }) {
   const [runs, setRuns] = useState(null); // null = loading
 
   useEffect(() => {

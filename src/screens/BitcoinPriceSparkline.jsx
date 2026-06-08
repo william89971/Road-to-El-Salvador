@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 // Tiny BTC price sparkline (~80px wide) drawn from gameState.btcPriceHistory.
-export default function Sparkline({ data, width = 84, height = 30, color = '#f7931a' }) {
+export default function BitcoinPriceSparkline({ data, width = 84, height = 30, color = '#f7931a' }) {
   const ref = useRef(null);
 
   useEffect(() => {

@@ -1,23 +1,23 @@
 import { useEffect, useRef, useState, useReducer } from 'react';
-import { gameState, tick, resetGame, CONFIG } from './game/gameState.js';
-import { ROUTE, BIOMES } from './data/route.js';
-import { ParallaxScene } from './game/ParallaxScene.js';
-import { audio } from './game/AudioManager.js';
-import StartScreen from './components/StartScreen.jsx';
-import HUD from './components/HUD.jsx';
-import CityStop from './components/CityStop.jsx';
-import EventCard from './components/EventCard.jsx';
-import GameOver from './components/GameOver.jsx';
-import Victory from './components/Victory.jsx';
-import WaveShooterModal from './components/WaveShooterModal.jsx';
-import RouteMap from './components/RouteMap.jsx';
-import ArrivalSequence from './components/ArrivalSequence.jsx';
-import Leaderboard from './components/Leaderboard.jsx';
-import { getEvent } from './ai/eventEngine.js';
-import { applyEffects } from './game/gameState.js';
-import { saveRun } from './game/leaderboard.js';
+import { gameState, tick, resetGame, CONFIG } from './game-engine/gameStateAndRules.js';
+import { ROUTE, BIOMES } from './map-data/citiesAndRoute.js';
+import { ParallaxScene } from './game-engine/drivingScene3D.js';
+import { audio } from './game-engine/soundEffects.js';
+import StartScreen from './screens/StartScreen.jsx';
+import HeadsUpDisplay from './screens/HeadsUpDisplay.jsx';
+import CityStopShop from './screens/CityStopShop.jsx';
+import NewspaperEventCard from './screens/NewspaperEventCard.jsx';
+import GameOverScreen from './screens/GameOverScreen.jsx';
+import VictoryScreen from './screens/VictoryScreen.jsx';
+import ShootingMinigameScreen from './screens/ShootingMinigameScreen.jsx';
+import RouteMapScreen from './screens/RouteMapScreen.jsx';
+import ArrivalCinematic from './screens/ArrivalCinematic.jsx';
+import LeaderboardScreen from './screens/LeaderboardScreen.jsx';
+import { getEvent } from './events/eventGenerator.js';
+import { applyEffects } from './game-engine/gameStateAndRules.js';
+import { saveRun } from './game-engine/leaderboardStorage.js';
 
-export default function App() {
+export default function GameController() {
   const canvasRef = useRef(null);
   const sceneRef = useRef(null);
   const [, forceRender] = useReducer((n) => n + 1, 0);
@@ -222,17 +222,17 @@ export default function App() {
 
       {s.screen === 'playing' && (
         <>
-          <HUD onToggleMap={toggleMap} onTogglePause={togglePause} onToggleMute={toggleMute} muted={muted} />
+          <HeadsUpDisplay onToggleMap={toggleMap} onTogglePause={togglePause} onToggleMute={toggleMute} muted={muted} />
           {s.cityStopIndex >= 0 && (
-            <CityStop index={s.cityStopIndex} onContinue={leaveCityStop} />
+            <CityStopShop index={s.cityStopIndex} onContinue={leaveCityStop} />
           )}
           {eventData && !shooter && (
-            <EventCard event={eventData} onChoose={resolveEvent} onFight={fightEvent} />
+            <NewspaperEventCard event={eventData} onChoose={resolveEvent} onFight={fightEvent} />
           )}
           {shooter && (
-            <WaveShooterModal biome={gameState.biome} onDone={endShooter} />
+            <ShootingMinigameScreen biome={gameState.biome} onDone={endShooter} />
           )}
-          {showMap && <RouteMap onClose={() => setShowMap(false)} />}
+          {showMap && <RouteMapScreen onClose={() => setShowMap(false)} />}
           {s.paused && s.cityStopIndex < 0 && !eventData && (
             <div style={styles.pauseOverlay} onClick={togglePause}>
               <div style={{ fontFamily: 'var(--font-title)', fontSize: 48 }}>PAUSED</div>
@@ -242,17 +242,17 @@ export default function App() {
         </>
       )}
 
-      {s.screen === 'gameover' && <GameOver onRestart={restart} onMenu={toMenu} />}
+      {s.screen === 'gameover' && <GameOverScreen onRestart={restart} onMenu={toMenu} />}
 
       {s.screen === 'arrival' && (
-        <ArrivalSequence onDone={() => { gameState.screen = 'victory'; saveRun(); forceRender(); }} />
+        <ArrivalCinematic onDone={() => { gameState.screen = 'victory'; saveRun(); forceRender(); }} />
       )}
 
       {s.screen === 'victory' && (
-        <Victory onRestart={restart} onMenu={toMenu} onShowLeaderboard={() => setShowLeaderboard(true)} />
+        <VictoryScreen onRestart={restart} onMenu={toMenu} onShowLeaderboard={() => setShowLeaderboard(true)} />
       )}
 
-      {showLeaderboard && <Leaderboard onClose={() => setShowLeaderboard(false)} />}
+      {showLeaderboard && <LeaderboardScreen onClose={() => setShowLeaderboard(false)} />}
     </>
   );
 }

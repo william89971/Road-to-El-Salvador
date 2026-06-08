@@ -1,5 +1,5 @@
-import { gameState, CONFIG } from '../game/gameState.js';
-import Sparkline from './Sparkline.jsx';
+import { gameState, CONFIG } from '../game-engine/gameStateAndRules.js';
+import BitcoinPriceSparkline from './BitcoinPriceSparkline.jsx';
 
 function startCashFor(difficulty) {
   const mult = difficulty === 'satoshi' ? 0.5 : difficulty === 'tourist' ? 1.5 : 1;
@@ -27,7 +27,7 @@ function Bar({ icon, value, max = 100, color, low }) {
   );
 }
 
-export default function HUD({ onToggleMap, onTogglePause, onToggleMute, muted }) {
+export default function HeadsUpDisplay({ onToggleMap, onTogglePause, onToggleMute, muted }) {
   const g = gameState;
   const start = startCashFor(g.difficulty);
   const now = Math.round(g.cash * (g.purchasingPower / 100)); // real purchasing power
@@ -87,7 +87,7 @@ export default function HUD({ onToggleMap, onTogglePause, onToggleMute, muted })
           </div>
         </div>
         <div style={s.spark}>
-          <Sparkline data={g.btcPriceHistory} width={188} height={34} />
+          <BitcoinPriceSparkline data={g.btcPriceHistory} width={188} height={34} />
         </div>
       </div>
 

@@ -1,6 +1,6 @@
-import { gameState, clamp } from './gameState.js';
-import { BIOMES } from '../data/route.js';
-import { audio } from './AudioManager.js';
+import { gameState, clamp } from './gameStateAndRules.js';
+import { BIOMES } from '../map-data/citiesAndRoute.js';
+import { audio } from './soundEffects.js';
 
 // Enemy archetypes. `breach` applies a loss to gameState when one reaches the
 // bottom; `kill` applies a reward (only the Central Banker has one).

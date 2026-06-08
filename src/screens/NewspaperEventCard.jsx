@@ -12,7 +12,7 @@ function tornTop() {
 }
 const TORN = tornTop();
 
-export default function EventCard({ event, onChoose, onFight }) {
+export default function NewspaperEventCard({ event, onChoose, onFight }) {
   const [chosen, setChosen] = useState(null);
 
   if (!event) return null;

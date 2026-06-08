@@ -1,6 +1,6 @@
 export async function saveRun() {
   try {
-    const { gameState } = await import('./gameState.js');
+    const { gameState } = await import('./gameStateAndRules.js');
     await window.storage.set(`run:${Date.now()}`, JSON.stringify({
       name: gameState.playerName || 'Anon',
       btc: gameState.btc,

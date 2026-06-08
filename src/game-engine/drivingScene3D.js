@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { gameState } from './gameState.js';
-import { BIOMES } from '../data/route.js';
-import { createSUV } from './SUV.js';
+import { gameState } from './gameStateAndRules.js';
+import { BIOMES } from '../map-data/citiesAndRoute.js';
+import { createSUV } from './truckModel3D.js';
 
 const VIEW_HEIGHT = 14;       // world units visible vertically
 const HORIZON_Y = -1.6;       // y where land meets sky

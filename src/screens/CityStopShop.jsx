@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { gameState, clamp } from '../game/gameState.js';
-import { ROUTE } from '../data/route.js';
+import { gameState, clamp } from '../game-engine/gameStateAndRules.js';
+import { ROUTE } from '../map-data/citiesAndRoute.js';
 
 const BASES = { refuel: 40, repair: 80 };
 
@@ -8,7 +8,7 @@ function inflated(base) {
   return Math.round(base / (gameState.purchasingPower / 100));
 }
 
-export default function CityStop({ index, onContinue }) {
+export default function CityStopShop({ index, onContinue }) {
   const stop = ROUTE[index];
   const [, bump] = useState(0);
   const [ready, setReady] = useState(!stop.isBorder); // border stops show a wait bar first

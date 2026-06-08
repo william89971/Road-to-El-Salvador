@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { gameState, CONFIG } from '../game/gameState.js';
+import { gameState, CONFIG } from '../game-engine/gameStateAndRules.js';
 
-export default function Victory({ onRestart, onMenu, onShowLeaderboard }) {
+export default function VictoryScreen({ onRestart, onMenu, onShowLeaderboard }) {
   const g = gameState;
   const [shared, setShared] = useState(false);
 

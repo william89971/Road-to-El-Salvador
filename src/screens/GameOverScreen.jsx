@@ -1,6 +1,6 @@
-import { gameState, CONFIG } from '../game/gameState.js';
+import { gameState, CONFIG } from '../game-engine/gameStateAndRules.js';
 
-export default function GameOver({ onRestart, onMenu }) {
+export default function GameOverScreen({ onRestart, onMenu }) {
   const g = gameState;
   const btcValue = Math.round(g.btc * g.btcPrice);
   const pct = Math.round((g.miles / CONFIG.TOTAL_MILES) * 100);

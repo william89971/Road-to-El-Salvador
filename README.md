@@ -52,6 +52,48 @@ To have **Claude** generate region-aware events instead of the mock pool:
   they reach the line. Ammo = vibes × 3. `Esc` to flee (−1 vibe).
 - **Arrival:** reach San Salvador for the cinematic and your final scorecard.
 
+## File guide — what each file does
+
+Every file is named for what it contains, so you can find things by vibes.
+
+```
+index.html                          the web page shell; loads the app + Google Fonts
+src/
+  appEntryPoint.jsx                 boots React and mounts the game into the page
+  GameController.jsx                THE BRAIN: runs the game loop, owns every screen,
+                                    wires city stops / events / ambushes / win + lose
+  globalStyles.css                  colors, fonts, and shared animations
+
+  game-engine/                      the moving parts that make the game *work*
+    gameStateAndRules.js            the single source of truth: all stats + the rules
+                                    that change them every frame (fuel, inflation, BTC price)
+    drivingScene3D.js               the 3D side-scrolling road (sky, mountains, dust,
+                                    day/night) drawn with Three.js
+    truckModel3D.js                 builds the beat-up SUV 3D model (body, wheels, headlights)
+    shootingMinigame.js             the 2D click-to-shoot ambush minigame (enemies, waves, ammo)
+    soundEffects.js                 every sound, made in code (engine hum, pings, gunshots…)
+    leaderboardStorage.js           saves and loads high scores
+
+  events/
+    eventGenerator.js               makes the newspaper events — mock ones, or live from Claude
+
+  map-data/
+    citiesAndRoute.js               the 8 cities (LA → San Salvador) + each region's colors
+
+  screens/                          everything you SEE (full screens + HUD overlays)
+    StartScreen.jsx                 name + difficulty pick
+    HeadsUpDisplay.jsx              the in-game HUD (fuel/health/vibes + hard-money widget)
+    BitcoinPriceSparkline.jsx       the little BTC price chart inside the HUD
+    CityStopShop.jsx                the refuel / repair / rest shop at each city
+    NewspaperEventCard.jsx          the torn-paper newspaper event popup
+    ShootingMinigameScreen.jsx      the wrapper that shows the ambush minigame
+    RouteMapScreen.jsx              the map panel with your position dot
+    ArrivalCinematic.jsx            the "DEPLOYED TO PRODUCTION" victory cutscene
+    GameOverScreen.jsx              the you-lost screen
+    VictoryScreen.jsx               the you-won scorecard
+    LeaderboardScreen.jsx           the high-scores list
+```
+
 ## Tech notes
 
 - One Three.js/WebGL context (the parallax driving scene); the wave-shooter is a separate 2D canvas.

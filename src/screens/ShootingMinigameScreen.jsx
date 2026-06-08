@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { WaveShooter } from '../game/WaveShooter.js';
-import { gameState } from '../game/gameState.js';
+import { WaveShooter } from '../game-engine/shootingMinigame.js';
+import { gameState } from '../game-engine/gameStateAndRules.js';
 
 const OUTCOMES = {
   cleared:  { title: 'AMBUSH CLEARED', color: '#5ec27a', sub: 'You held the line. Stack intact.' },
@@ -8,7 +8,7 @@ const OUTCOMES = {
   fled:     { title: 'YOU FLED', color: '#e8b04a', sub: 'Discretion over valor. (−1 vibe)' },
 };
 
-export default function WaveShooterModal({ biome, onDone }) {
+export default function ShootingMinigameScreen({ biome, onDone }) {
   const canvasRef = useRef(null);
   const [phase, setPhase] = useState('intro'); // 'intro' | 'fight' | 'result'
   const [result, setResult] = useState(null);

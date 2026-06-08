@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { gameState } from '../game/gameState.js';
-import { audio } from '../game/AudioManager.js';
+import { gameState } from '../game-engine/gameStateAndRules.js';
+import { audio } from '../game-engine/soundEffects.js';
 
 const FULL_TEXT = 'DEPLOYED TO PRODUCTION';
 
-export default function ArrivalSequence({ onDone }) {
+export default function ArrivalCinematic({ onDone }) {
   const canvasRef = useRef(null);
   const [typed, setTyped] = useState(0);
   const [showLogo, setShowLogo] = useState(false);
