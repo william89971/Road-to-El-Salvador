@@ -9,10 +9,21 @@ import { createSUV } from './truckModel3D.js';
 // GameController.jsx needs zero changes.
 
 const TILE = 600;          // length of one scrolling tile on the Z axis
-const ROAD_W = 20;         // road width
+const ROAD_W = 14;         // road width
 const TERRAIN_W = 120;     // each terrain tile width
-const TERRAIN_X = 70;      // terrain tile center offset (road half 10 + terrain half 60)
+const TERRAIN_X = 67;      // terrain tile center offset (road half 7 + terrain half 60)
+const SCROLL = 5;          // world units scrolled per mile (driving-feel speed)
+const HILL_FREQ = Math.PI / 60; // z hill frequency: period 120 → exactly 5 per TILE,
+                                // so the terrain is periodic over TILE and the
+                                // treadmill wrap is perfectly seamless (no crease)
 const NIGHT_SKY = '#0a0814';
+
+// Rolling-hill height at a world (x,z). Ramped to 0 near the road so the
+// shoulders sit flat (no walls beside the road) and props rest on the surface.
+function terrainHeight(x, z) {
+  const ramp = Math.min(1, Math.max(0, (Math.abs(x) - ROAD_W / 2) / 25));
+  return Math.sin(x * 0.08) * Math.cos(z * HILL_FREQ) * 6 * ramp;
+}
 
 // lighten (amt>0) / darken (amt<0) a hex color, returns a THREE.Color
 function shade(hex, amt) {
@@ -38,14 +49,16 @@ export class ParallaxScene {
     this.scene = new THREE.Scene();
 
     const biome = BIOMES[gameState.biome] || BIOMES.california;
-    this.currentBiome = gameState.biome;
     this.currentProp = biome.prop;
-    this.skyHex = biome.sky;
+    this.curMid = new THREE.Color(biome.mid); // displayed colors, lerped toward the active biome
+    this.curSky = new THREE.Color(biome.sky);
+    this._t1 = new THREE.Color();
+    this._t2 = new THREE.Color();
 
     // ---- camera: behind & above the SUV, looking slightly down toward it ----
     this.camera = new THREE.PerspectiveCamera(60, this.width / this.height, 0.1, 600);
-    this.camera.position.set(0, 8, -14);
-    this.camera.lookAt(0, 1.5, 8);
+    this.camera.position.set(0, 9, -15);
+    this.camera.lookAt(0, 1, 14);
 
     // ---- lights ----
     this.dirLight = new THREE.DirectionalLight(0xfff2d6, 1.2);
@@ -55,11 +68,11 @@ export class ParallaxScene {
     this.scene.add(this.ambient);
 
     // ---- fog: matches sky, gives depth ----
-    this.scene.fog = new THREE.Fog(this.skyHex, 80, 200);
-    this.renderer.setClearColor(this.skyHex);
+    this.scene.fog = new THREE.Fog(biome.sky, 80, 200);
+    this.renderer.setClearColor(biome.sky);
 
     // ---- shared materials (updated on biome change) ----
-    this.roadMat = new THREE.MeshLambertMaterial({ color: 0x2a2a2a });
+    this.roadMat = new THREE.MeshLambertMaterial({ color: 0x3b3b3d });
     this.dashMat = new THREE.MeshLambertMaterial({ color: 0xe8c54a, emissive: 0x3a2f00 });
     this.terrainMat = new THREE.MeshLambertMaterial({ color: new THREE.Color(biome.mid) });
     this.mountainMat = new THREE.MeshLambertMaterial({ color: shade(biome.mid, -0.35) });
@@ -110,11 +123,12 @@ export class ParallaxScene {
     // ---- the SUV (fixed in world space, facing down the road = +Z) ----
     this.suv = createSUV();
     this.suv.group.rotation.y = -Math.PI / 2;
-    this.suv.group.position.set(0, 0.5, 0);
+    this.suv.group.position.set(0, 0, 0);
     this.scene.add(this.suv.group);
 
-    this._props = false;
-    this._applyBiome(); // colors + props for the starting biome
+    this._lastScroll = gameState.miles * SCROLL;
+
+    this._rebuildProps(); // initial props for the starting biome
   }
 
   _makeTile() {
@@ -134,10 +148,10 @@ export class ParallaxScene {
     const tl = new THREE.Mesh(this.terrainGeoL, this.terrainMat); tl.position.x = -TERRAIN_X; tile.add(tl);
     const tr = new THREE.Mesh(this.terrainGeoR, this.terrainMat); tr.position.x = TERRAIN_X; tile.add(tr);
 
-    // mountains (far back)
+    // mountains (far back, base seated on the ground)
     for (const m of this.mountainLayout) {
       const cone = new THREE.Mesh(this.coneGeo, this.mountainMat);
-      cone.position.set(m.x, m.y, m.z);
+      cone.position.set(m.x, m.sy / 2, m.z);
       cone.scale.set(m.sx, m.sy, m.sz);
       tile.add(cone);
     }
@@ -197,25 +211,10 @@ export class ParallaxScene {
       props.clear();
       for (const p of this.propLayout) {
         const prop = this._propMesh(this.currentProp);
-        prop.position.set(p.x, 0, p.z);
+        prop.position.set(p.x, terrainHeight(p.x, p.z), p.z);
         prop.scale.setScalar(p.s);
         props.add(prop);
       }
-    }
-  }
-
-  // push biome colors into the shared materials + sky/fog, rebuild props
-  _applyBiome() {
-    const b = BIOMES[gameState.biome] || BIOMES.california;
-    this.terrainMat.color.set(b.mid);
-    this.mountainMat.color.copy(shade(b.mid, -0.35));
-    this.propMat.color.copy(shade(b.mid, -0.2));
-    this.skyHex = b.sky;
-    this.scene.fog.color.set(b.sky);
-    if (b.prop !== this.currentProp || !this._props) {
-      this.currentProp = b.prop;
-      this._rebuildProps();
-      this._props = true;
     }
   }
 
@@ -228,20 +227,27 @@ export class ParallaxScene {
 
   update(dt) {
     const s = gameState;
+    const b = BIOMES[s.biome] || BIOMES.california;
 
-    // biome change → update colors, sky, props
-    if (s.biome !== this.currentBiome) {
-      this.currentBiome = s.biome;
-      this._applyBiome();
-    }
+    // smoothly lerp biome colors (terrain / mountains / props / sky / fog)
+    const k = 1 - Math.exp(-dt / 0.8);
+    this.curMid.lerp(this._t1.set(b.mid), k);
+    this.curSky.lerp(this._t2.set(b.sky), k);
+    if (b.prop !== this.currentProp) { this.currentProp = b.prop; this._rebuildProps(); }
+    this.terrainMat.color.copy(this.curMid);
+    this.mountainMat.color.copy(this.curMid).multiplyScalar(0.6);
+    this.propMat.color.copy(this.curMid).multiplyScalar(0.8);
 
-    // seamless infinite scroll: two tiles leapfrog along Z by miles * 0.1
-    const offset = ((s.miles * 0.1) % TILE + TILE) % TILE;
+    // seamless infinite scroll: two tiles leapfrog along Z as the world moves
+    const scroll = s.miles * SCROLL;
+    const offset = ((scroll % TILE) + TILE) % TILE;
     this.tiles[0].position.z = -offset;
     this.tiles[1].position.z = TILE - offset;
 
-    // spin wheels
-    for (const w of this.suv.wheels) w.rotation.z -= dt * 2;
+    // spin wheels to match the road motion (stops when the SUV is stopped)
+    const dScroll = scroll - this._lastScroll;
+    this._lastScroll = scroll;
+    for (const w of this.suv.wheels) w.rotation.z -= dScroll / 0.6;
 
     // day/night
     const t = s.timeOfDay;
@@ -249,13 +255,13 @@ export class ParallaxScene {
     if (night) {
       this.renderer.setClearColor(NIGHT_SKY);
       this.scene.fog.color.set(NIGHT_SKY);
-      this.ambient.intensity = 0.1;
-      this.dirLight.intensity = 0.25;
-      for (const hl of this.suv.headlights) hl.intensity = 2.6;
-      for (const bm of this.suv.beams) bm.material.opacity = 0.25;
+      this.ambient.intensity = 0.12;
+      this.dirLight.intensity = 0.3;
+      for (const hl of this.suv.headlights) hl.intensity = 2.2;
+      for (const bm of this.suv.beams) bm.material.opacity = 0.3;
     } else {
-      this.renderer.setClearColor(this.skyHex);
-      this.scene.fog.color.set(this.skyHex);
+      this.renderer.setClearColor(this.curSky);
+      this.scene.fog.color.copy(this.curSky);
       this.ambient.intensity = 0.4;
       this.dirLight.intensity = 1.2;
       for (const hl of this.suv.headlights) hl.intensity = 0;
@@ -284,7 +290,7 @@ function makeTerrainGeo(offsetX) {
   const pos = g.attributes.position;
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), z = pos.getZ(i);
-    pos.setY(i, Math.sin((x + offsetX) * 0.08) * Math.cos(z * 0.05) * 6);
+    pos.setY(i, terrainHeight(x + offsetX, z));
   }
   pos.needsUpdate = true;
   g.computeVertexNormals();
