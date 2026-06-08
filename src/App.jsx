@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useReducer } from 'react';
-import { gameState, tick, resetGame, CONFIG, DEV_MODE } from './game/gameState.js';
+import { gameState, tick, resetGame, CONFIG } from './game/gameState.js';
 import { ROUTE, BIOMES } from './data/route.js';
 import { ParallaxScene } from './game/ParallaxScene.js';
 import { audio } from './game/AudioManager.js';
@@ -12,8 +12,10 @@ import Victory from './components/Victory.jsx';
 import WaveShooterModal from './components/WaveShooterModal.jsx';
 import RouteMap from './components/RouteMap.jsx';
 import ArrivalSequence from './components/ArrivalSequence.jsx';
+import Leaderboard from './components/Leaderboard.jsx';
 import { getEvent } from './ai/eventEngine.js';
 import { applyEffects } from './game/gameState.js';
+import { saveRun } from './game/leaderboard.js';
 
 export default function App() {
   const canvasRef = useRef(null);
@@ -23,12 +25,17 @@ export default function App() {
   const [eventData, setEventData] = useState(null);
   const eventDataRef = useRef(null);
   const [shooter, setShooter] = useState(null); // null | { source }
+  const [muted, setMuted] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+
+  // audio reaction bookkeeping
+  const audioRef = useRef({ histLen: 1, btc: CONFIG.START_BTC_PRICE, gasAlarm: false, suvAlarm: false, engine: false });
 
   // ---- mount the single Three.js scene + run the rAF loop ----------------
   useEffect(() => {
     const scene = new ParallaxScene(canvasRef.current);
     sceneRef.current = scene;
-    if (DEV_MODE) { window.gameState = gameState; window.__fireEvent = fireEvent; } // dev-only debug handles
+    if (import.meta.env.DEV) { window.gameState = gameState; window.__fireEvent = fireEvent; } // dev-only debug handles (stripped from production build)
 
     let raf, last = performance.now();
     let eventTimer = scheduleNextEvent();
@@ -44,6 +51,7 @@ export default function App() {
         if (eventTimer <= 0) { fireEvent(); eventTimer = scheduleNextEvent(); }
       }
       handleArrival();
+      reactAudio();
 
       scene.update(dt);
       raf = requestAnimationFrame(loop);
@@ -62,12 +70,34 @@ export default function App() {
       clearInterval(sync);
       scene.dispose();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ---- orchestration helpers --------------------------------------------
   function scheduleNextEvent() {
     return CONFIG.EVENT_MIN_MS + Math.random() * (CONFIG.EVENT_MAX_MS - CONFIG.EVENT_MIN_MS);
+  }
+
+  // Engine hum lifecycle + BTC-up ping + low-resource alarm.
+  function reactAudio() {
+    const a = audioRef.current;
+    const playing = gameState.screen === 'playing';
+
+    if (playing && audio.on && !a.engine) { audio.startEngine(); a.engine = true; }
+    if ((!playing || !audio.on) && a.engine) { audio.stopEngine(); a.engine = false; }
+    if (!playing) return;
+
+    // ping when a fresh, higher BTC price point lands
+    const len = gameState.btcPriceHistory.length;
+    if (len !== a.histLen) {
+      if (gameState.btcPrice > a.btc) audio.ping(900);
+      a.histLen = len; a.btc = gameState.btcPrice;
+    }
+
+    // one alarm per dip below 20% (rearm at 25%)
+    if (gameState.gas < 20 && !a.gasAlarm) { audio.alarm(); a.gasAlarm = true; }
+    if (gameState.gas >= 25) a.gasAlarm = false;
+    if (gameState.suvHealth < 20 && !a.suvAlarm) { audio.alarm(); a.suvAlarm = true; }
+    if (gameState.suvHealth >= 25) a.suvAlarm = false;
   }
 
   function fireEvent() {
@@ -127,14 +157,18 @@ export default function App() {
   }
 
   // ---- screen actions ----------------------------------------------------
+  const resetAudioBookkeeping = () => {
+    audioRef.current = { histLen: 1, btc: CONFIG.START_BTC_PRICE, gasAlarm: false, suvAlarm: false, engine: audioRef.current.engine };
+  };
+
   const handleStart = (name, difficulty) => {
     audio.init();
-    audio.startEngine();
     resetGame(name, difficulty);
     gameState.lastStopIndex = 0; // already at LA (index 0)
     gameState.cityStopIndex = -1;
     eventDataRef.current = null;
     setEventData(null);
+    resetAudioBookkeeping();
     forceRender();
   };
 
@@ -158,6 +192,11 @@ export default function App() {
 
   const togglePause = () => { gameState.paused = !gameState.paused; forceRender(); };
   const toggleMap = () => { setShowMap((v) => !v); };
+  const toggleMute = () => {
+    audio.on = !audio.on;
+    setMuted(!audio.on);
+    if (!audio.on) { audio.stopEngine(); audioRef.current.engine = false; }
+  };
 
   const restart = () => {
     resetGame(gameState.playerName, gameState.difficulty);
@@ -166,6 +205,7 @@ export default function App() {
     eventDataRef.current = null;
     setEventData(null);
     setShooter(null);
+    resetAudioBookkeeping();
     forceRender();
   };
   const toMenu = () => { gameState.screen = 'start'; setShooter(null); forceRender(); };
@@ -176,11 +216,13 @@ export default function App() {
     <>
       <canvas ref={canvasRef} style={styles.canvas} />
 
-      {s.screen === 'start' && <StartScreen onStart={handleStart} />}
+      {s.screen === 'start' && (
+        <StartScreen onStart={handleStart} onShowLeaderboard={() => setShowLeaderboard(true)} />
+      )}
 
       {s.screen === 'playing' && (
         <>
-          <HUD onToggleMap={toggleMap} onTogglePause={togglePause} />
+          <HUD onToggleMap={toggleMap} onTogglePause={togglePause} onToggleMute={toggleMute} muted={muted} />
           {s.cityStopIndex >= 0 && (
             <CityStop index={s.cityStopIndex} onContinue={leaveCityStop} />
           )}
@@ -203,10 +245,14 @@ export default function App() {
       {s.screen === 'gameover' && <GameOver onRestart={restart} onMenu={toMenu} />}
 
       {s.screen === 'arrival' && (
-        <ArrivalSequence onDone={() => { gameState.screen = 'victory'; forceRender(); }} />
+        <ArrivalSequence onDone={() => { gameState.screen = 'victory'; saveRun(); forceRender(); }} />
       )}
 
-      {s.screen === 'victory' && <Victory onRestart={restart} onMenu={toMenu} />}
+      {s.screen === 'victory' && (
+        <Victory onRestart={restart} onMenu={toMenu} onShowLeaderboard={() => setShowLeaderboard(true)} />
+      )}
+
+      {showLeaderboard && <Leaderboard onClose={() => setShowLeaderboard(false)} />}
     </>
   );
 }

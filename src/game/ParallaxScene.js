@@ -138,6 +138,18 @@ function makeRoadTexture() {
   return t;
 }
 
+function makeDotTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 32;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad; g.fillRect(0, 0, 32, 32);
+  const t = new THREE.CanvasTexture(c);
+  return t;
+}
+
 function makeStarTexture() {
   const c = document.createElement('canvas');
   c.width = 512; c.height = 256;
@@ -173,6 +185,7 @@ export class ParallaxScene {
     this.lastMiles = gameState.miles;
 
     this._buildLayers();
+    this._buildParticles();
     this._buildLights();
 
     const suv = createSUV();
@@ -240,6 +253,29 @@ export class ParallaxScene {
     this.roadTex = this.roadMat.map;
     this.roadTex.repeat.x = W / 6;
     this.scene.add(road);
+  }
+
+  _buildParticles() {
+    const N = 70;
+    const W = this._viewWidth();
+    this._pW = W + 4;
+    const pos = new Float32Array(N * 3);
+    this._pSpeed = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+      pos[i * 3] = (Math.random() - 0.5) * this._pW;
+      pos[i * 3 + 1] = -7 + Math.random() * 12;      // road dust up into low sky
+      pos[i * 3 + 2] = -1.5;
+      this._pSpeed[i] = 1.2 + Math.random() * 2.6;   // horizontal drift
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    this._pGeo = geo;
+    this.dustMat = new THREE.PointsMaterial({
+      size: 0.5, map: makeDotTexture(), transparent: true, depthWrite: false,
+      blending: THREE.NormalBlending, opacity: 0.3, color: new THREE.Color('#d8c08a'),
+    });
+    this.particles = new THREE.Points(geo, this.dustMat);
+    this.scene.add(this.particles);
   }
 
   _buildLights() {
@@ -314,6 +350,21 @@ export class ParallaxScene {
     this.midTex.offset.x = off * 0.6;
     this.roadTex.offset.x = off * 1.0;
     this.starsTex.offset.x = off * 0.05;
+
+    // dust (arid) vs mist (lush) particles
+    const arid = ['california', 'baja', 'sonora', 'central_mx'].includes(s.biome);
+    const dustTarget = new THREE.Color(arid ? '#d8c08a' : '#cfe6d8');
+    this.dustMat.color.lerp(dustTarget.multiply(tint), k);
+    this.dustMat.opacity = (arid ? 0.34 : 0.2) * (1 - night * 0.4);
+    const pos = this._pGeo.attributes.position;
+    const driftBase = s.paused ? 0.15 : 1;
+    for (let i = 0; i < this._pSpeed.length; i++) {
+      let x = pos.getX(i) - this._pSpeed[i] * dt * driftBase;
+      if (x < -this._pW / 2) x += this._pW;
+      pos.setX(i, x);
+      pos.setY(i, pos.getY(i) + Math.sin((this._bob + i) * 0.7) * dt * 0.12);
+    }
+    pos.needsUpdate = true;
 
     // spin wheels with distance traveled; engine idle bob when paused/stopped
     const dMiles = s.miles - this.lastMiles;

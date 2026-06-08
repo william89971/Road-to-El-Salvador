@@ -121,7 +121,7 @@ const st = {
   svcDetail: { fontSize: 10.5, color: '#b6a98c', marginTop: 2, minHeight: 24 },
   svcPrice: { marginTop: 6, fontWeight: 700, color: 'var(--btc)', fontSize: 14 },
   continue: { width: '100%', marginTop: 18, padding: '14px', fontSize: 22, borderRadius: 12, background: 'var(--btc)', color: '#1a1411' },
-  dangerHint: { textAlign: 'center', fontSize: 11.5, color: '#d39', marginTop: 8, color: '#e08a7a' },
+  dangerHint: { textAlign: 'center', fontSize: 11.5, color: '#e08a7a', marginTop: 8 },
   borderBox: { padding: '20px 0' },
   borderTitle: { textAlign: 'center', fontFamily: 'var(--font-title)', fontSize: 22, marginBottom: 12 },
   waitTrack: { height: 12, background: 'rgba(0,0,0,0.5)', borderRadius: 6, overflow: 'hidden' },

@@ -27,7 +27,7 @@ function Bar({ icon, value, max = 100, color, low }) {
   );
 }
 
-export default function HUD({ onToggleMap, onTogglePause }) {
+export default function HUD({ onToggleMap, onTogglePause, onToggleMute, muted }) {
   const g = gameState;
   const start = startCashFor(g.difficulty);
   const now = Math.round(g.cash * (g.purchasingPower / 100)); // real purchasing power
@@ -95,6 +95,9 @@ export default function HUD({ onToggleMap, onTogglePause }) {
       <div style={s.controls}>
         <button style={s.ctrlBtn} onClick={onTogglePause} title="Pause">
           {g.paused ? '▶' : 'II'}
+        </button>
+        <button style={s.ctrlBtn} onClick={onToggleMute} title="Sound">
+          {muted ? '🔇' : '🔊'}
         </button>
       </div>
 
