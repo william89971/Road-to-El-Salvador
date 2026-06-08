@@ -9,6 +9,9 @@ import CityStop from './components/CityStop.jsx';
 import EventCard from './components/EventCard.jsx';
 import GameOver from './components/GameOver.jsx';
 import Victory from './components/Victory.jsx';
+import WaveShooterModal from './components/WaveShooterModal.jsx';
+import RouteMap from './components/RouteMap.jsx';
+import ArrivalSequence from './components/ArrivalSequence.jsx';
 import { getEvent } from './ai/eventEngine.js';
 import { applyEffects } from './game/gameState.js';
 
@@ -19,6 +22,7 @@ export default function App() {
   const [showMap, setShowMap] = useState(false);
   const [eventData, setEventData] = useState(null);
   const eventDataRef = useRef(null);
+  const [shooter, setShooter] = useState(null); // null | { source }
 
   // ---- mount the single Three.js scene + run the rAF loop ----------------
   useEffect(() => {
@@ -87,10 +91,13 @@ export default function App() {
   };
 
   const fightEvent = () => {
-    // Phase B opens the WaveShooter here. For now resolve as "stood your ground".
+    // "Stand your ground" opens the WaveShooter instead of applying effects.
+    gameState.recentEventTitles.push(eventDataRef.current?.headline);
+    if (gameState.recentEventTitles.length > 10) gameState.recentEventTitles.shift();
+    gameState.eventsSurvived++;
     eventDataRef.current = null;
     setEventData(null);
-    gameState.paused = false;
+    setShooter({ source: 'event' }); // stays paused until the shooter resolves
   };
 
   function handleCityStops() {
@@ -134,10 +141,19 @@ export default function App() {
   const leaveCityStop = () => {
     const i = gameState.cityStopIndex;
     gameState.cityStopIndex = -1;
-    // Dangerous stop (Tegucigalpa) triggers the wave-shooter — wired in Phase B.
+    if (ROUTE[i] && ROUTE[i].dangerous) {
+      // Dangerous stop (Tegucigalpa) pushes you straight into an ambush.
+      setShooter({ source: 'stop' }); // stays paused until the shooter resolves
+    } else {
+      gameState.paused = false;
+    }
+    forceRender();
+  };
+
+  const endShooter = () => {
+    setShooter(null);
     gameState.paused = false;
     forceRender();
-    void i;
   };
 
   const togglePause = () => { gameState.paused = !gameState.paused; forceRender(); };
@@ -149,9 +165,10 @@ export default function App() {
     gameState.cityStopIndex = -1;
     eventDataRef.current = null;
     setEventData(null);
+    setShooter(null);
     forceRender();
   };
-  const toMenu = () => { gameState.screen = 'start'; forceRender(); };
+  const toMenu = () => { gameState.screen = 'start'; setShooter(null); forceRender(); };
 
   // ---- render ------------------------------------------------------------
   const s = gameState;
@@ -167,9 +184,13 @@ export default function App() {
           {s.cityStopIndex >= 0 && (
             <CityStop index={s.cityStopIndex} onContinue={leaveCityStop} />
           )}
-          {eventData && (
+          {eventData && !shooter && (
             <EventCard event={eventData} onChoose={resolveEvent} onFight={fightEvent} />
           )}
+          {shooter && (
+            <WaveShooterModal biome={gameState.biome} onDone={endShooter} />
+          )}
+          {showMap && <RouteMap onClose={() => setShowMap(false)} />}
           {s.paused && s.cityStopIndex < 0 && !eventData && (
             <div style={styles.pauseOverlay} onClick={togglePause}>
               <div style={{ fontFamily: 'var(--font-title)', fontSize: 48 }}>PAUSED</div>
@@ -181,11 +202,11 @@ export default function App() {
 
       {s.screen === 'gameover' && <GameOver onRestart={restart} onMenu={toMenu} />}
 
-      {/* Phase B inserts the ArrivalSequence cinematic before victory; for now
-          'arrival' shows the Victory screen directly so the game is winnable. */}
-      {(s.screen === 'arrival' || s.screen === 'victory') && (
-        <Victory onRestart={restart} onMenu={toMenu} />
+      {s.screen === 'arrival' && (
+        <ArrivalSequence onDone={() => { gameState.screen = 'victory'; forceRender(); }} />
       )}
+
+      {s.screen === 'victory' && <Victory onRestart={restart} onMenu={toMenu} />}
     </>
   );
 }
