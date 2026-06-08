@@ -1,0 +1,22 @@
+- generic [ref=e5]:
+  - generic [ref=e6]: A CROSS-CONTINENTAL HARD-MONEY ROAD TRIP
+  - heading "🛻₿ Bitcoin Road Trip" [level=1] [ref=e7]
+  - paragraph [ref=e8]: Drive a beat-up SUV from Los Angeles to San Salvador. Cash inflates. Bitcoin appreciates. Defend your stack.
+  - generic [ref=e9]: Driver name
+  - textbox "Anon" [ref=e10]
+  - generic [ref=e11]: Difficulty
+  - generic [ref=e12]:
+    - button "🏖️ Tourist Extra cash. A gentle cruise." [ref=e13] [cursor=pointer]:
+      - generic [ref=e14]: 🏖️
+      - generic [ref=e15]: Tourist
+      - generic [ref=e16]: Extra cash. A gentle cruise.
+    - button "🛻 Road Warrior The intended way to play." [ref=e17] [cursor=pointer]:
+      - generic [ref=e18]: 🛻
+      - generic [ref=e19]: Road Warrior
+      - generic [ref=e20]: The intended way to play.
+    - button "🔥 Satoshi Half the cash. Stay humble." [ref=e21] [cursor=pointer]:
+      - generic [ref=e22]: 🔥
+      - generic [ref=e23]: Satoshi
+      - generic [ref=e24]: Half the cash. Stay humble.
+  - button "START THE ENGINE ▸" [ref=e25] [cursor=pointer]
+  - generic [ref=e26]: 2,800 miles · 8 stops · newspaper events · wave-shooter ambushes

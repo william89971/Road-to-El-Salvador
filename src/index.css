@@ -1,0 +1,88 @@
+:root {
+  /* Color tokens (per spec) */
+  --bg: #1a1411;
+  --paper: #f5e6ca;
+  --btc: #f7931a;
+  --cash: #4a7c59;
+  --danger: #c0392b;
+  --ink: #2b2b2b;
+
+  /* Fonts */
+  --font-title: 'Bebas Neue', 'Arial Narrow', sans-serif;
+  --font-num: 'Inconsolata', 'Courier New', monospace;
+  --font-news: 'Playfair Display', 'Times New Roman', serif;
+
+  color-scheme: dark;
+  font-family: var(--font-num);
+  color: var(--paper);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--bg);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+button {
+  font-family: var(--font-title);
+  cursor: pointer;
+  border: none;
+  outline: none;
+  letter-spacing: 0.04em;
+}
+
+input {
+  font-family: var(--font-num);
+}
+
+canvas {
+  display: block;
+}
+
+/* Shared animations */
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.7); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes cardDrop {
+  0% { opacity: 0; transform: translateY(-40px) rotate(var(--rot, -2deg)) scale(0.96); }
+  100% { opacity: 1; transform: translateY(0) rotate(var(--rot, -2deg)) scale(1); }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+@keyframes borderBar {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(247, 147, 26, 0.4); border-radius: 4px; }
