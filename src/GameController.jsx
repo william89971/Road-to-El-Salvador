@@ -30,6 +30,7 @@ export default function GameController() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [nameBanner, setNameBanner] = useState(null); // ROUTE stop shown as a cinematic banner
   const bannerTimerRef = useRef(null);
+  const eventTimerRef = useRef(0); // ms until next random event (reset per run)
 
   // audio reaction bookkeeping
   const audioRef = useRef({ histLen: 1, btc: CONFIG.START_BTC_PRICE, gasAlarm: false, suvAlarm: false, engine: false });
@@ -41,7 +42,7 @@ export default function GameController() {
     if (import.meta.env.DEV) { window.gameState = gameState; window.__fireEvent = fireEvent; } // dev-only debug handles (stripped from production build)
 
     let raf, last = performance.now();
-    let eventTimer = scheduleNextEvent();
+    eventTimerRef.current = scheduleNextEvent();
 
     const loop = (now) => {
       const dt = Math.min(0.05, (now - last) / 1000); // clamp big tab-switch gaps
@@ -50,8 +51,8 @@ export default function GameController() {
       tick(dt);
       handleCityStops();
       if (gameState.screen === 'playing' && !gameState.paused) {
-        eventTimer -= dt * 1000;
-        if (eventTimer <= 0) { fireEvent(); eventTimer = scheduleNextEvent(); }
+        eventTimerRef.current -= dt * 1000;
+        if (eventTimerRef.current <= 0) { fireEvent(); eventTimerRef.current = scheduleNextEvent(); }
       }
       handleArrival();
       reactAudio();
@@ -84,9 +85,10 @@ export default function GameController() {
   function reactAudio() {
     const a = audioRef.current;
     const playing = gameState.screen === 'playing';
+    const running = playing && !gameState.paused; // engine hums only while actually driving
 
-    if (playing && audio.on && !a.engine) { audio.startEngine(); a.engine = true; }
-    if ((!playing || !audio.on) && a.engine) { audio.stopEngine(); a.engine = false; }
+    if (running && audio.on && !a.engine) { audio.startEngine(); a.engine = true; }
+    if ((!running || !audio.on) && a.engine) { audio.stopEngine(); a.engine = false; }
     if (!playing) return;
 
     // ping when a fresh, higher BTC price point lands
@@ -180,6 +182,7 @@ export default function GameController() {
     setEventData(null);
     clearTimeout(bannerTimerRef.current);
     setNameBanner(null);
+    eventTimerRef.current = scheduleNextEvent();
     resetAudioBookkeeping();
     forceRender();
   };
@@ -219,6 +222,7 @@ export default function GameController() {
     setShooter(null);
     clearTimeout(bannerTimerRef.current);
     setNameBanner(null);
+    eventTimerRef.current = scheduleNextEvent();
     resetAudioBookkeeping();
     forceRender();
   };

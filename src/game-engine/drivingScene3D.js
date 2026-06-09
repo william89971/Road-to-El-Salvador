@@ -449,19 +449,20 @@ export class ParallaxScene {
   }
 
   _updateLandmarks(dt, s) {
-    // find the nearest upcoming city within 200 miles
-    let active = -1;
+    // nearest landmark in the approach window: ahead up to 200 miles, plus a
+    // short tail behind so it recedes past the camera (z<0) instead of being
+    // clamped onto the SUV at z=0.
+    let active = -1, activeRem = 0;
     for (let i = 0; i < ROUTE.length; i++) {
       const rem = ROUTE[i].mile - s.miles;
-      if (rem >= -3 && rem <= 200) { active = i; break; }
+      if (rem >= -16 && rem <= 200) { active = i; activeRem = rem; break; }
     }
     for (let i = 0; i < this.landmarks.length; i++) {
       const lm = this.landmarks[i];
       const on = i === active;
       lm.group.visible = on;
       if (on) {
-        const rem = Math.max(0, ROUTE[i].mile - s.miles);
-        lm.group.position.set(lm.side, lm.baseY, rem * 1.25);
+        lm.group.position.set(lm.side, lm.baseY, activeRem * 1.25); // negative once passed → behind camera
         if (lm.lava) updateParticleField(lm.lava, dt, true);
       }
     }
