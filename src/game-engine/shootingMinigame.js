@@ -28,7 +28,7 @@ export class WaveShooter {
 
     this.enemies = [];
     this.particles = [];
-    this.ammo = Math.max(6, gameState.vibes * 3);
+    this.ammo = Math.max(3, gameState.vibes * 3); // ammo = vibes × 3 (vibes is ≥1 in play)
     this.wave = 0;
     this.totalWaves = 3;
     this.defeated = 0;
@@ -89,7 +89,7 @@ export class WaveShooter {
     if (this.done) return;
     const r = this.canvas.getBoundingClientRect();
     const px = e.clientX - r.left, py = e.clientY - r.top;
-    if (this.ammo <= 0) { audio.gunshot(); return; }
+    if (this.ammo <= 0) return; // out of ammo — no shot, no sound
     this.ammo--;
     audio.gunshot();
     this.muzzle = { x: px, y: py, t: 0.12 };

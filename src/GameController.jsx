@@ -115,10 +115,16 @@ export default function GameController() {
     }).catch(() => { gameState.paused = false; });
   }
 
+  // keep only a few recent titles so the small mock-event pool still rotates
+  const rememberEvent = (title) => {
+    if (!title) return;
+    gameState.recentEventTitles.push(title);
+    if (gameState.recentEventTitles.length > 3) gameState.recentEventTitles.shift();
+  };
+
   const resolveEvent = (effects, ev) => {
     applyEffects(effects);
-    gameState.recentEventTitles.push(ev.headline);
-    if (gameState.recentEventTitles.length > 10) gameState.recentEventTitles.shift();
+    rememberEvent(ev.headline);
     gameState.eventsSurvived++;
     eventDataRef.current = null;
     setEventData(null);
@@ -127,9 +133,8 @@ export default function GameController() {
 
   const fightEvent = () => {
     // "Stand your ground" opens the WaveShooter instead of applying effects.
-    gameState.recentEventTitles.push(eventDataRef.current?.headline);
-    if (gameState.recentEventTitles.length > 10) gameState.recentEventTitles.shift();
-    gameState.eventsSurvived++;
+    // eventsSurvived is credited when the shooter actually resolves (endShooter).
+    rememberEvent(eventDataRef.current?.headline);
     eventDataRef.current = null;
     setEventData(null);
     setShooter({ source: 'event' }); // stays paused until the shooter resolves
@@ -200,6 +205,8 @@ export default function GameController() {
   };
 
   const endShooter = () => {
+    // a "Stand your ground" event only counts as survived once the ambush resolves
+    if (shooter?.source === 'event') gameState.eventsSurvived++;
     setShooter(null);
     gameState.paused = false;
     forceRender();
@@ -226,7 +233,15 @@ export default function GameController() {
     resetAudioBookkeeping();
     forceRender();
   };
-  const toMenu = () => { gameState.screen = 'start'; setShooter(null); clearTimeout(bannerTimerRef.current); setNameBanner(null); forceRender(); };
+  const toMenu = () => {
+    gameState.screen = 'start';
+    setShooter(null);
+    eventDataRef.current = null;
+    setEventData(null);
+    clearTimeout(bannerTimerRef.current);
+    setNameBanner(null);
+    forceRender();
+  };
 
   // ---- render ------------------------------------------------------------
   const s = gameState;

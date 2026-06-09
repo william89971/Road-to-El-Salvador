@@ -359,17 +359,18 @@ export class ParallaxScene {
     this.suv.setColor(this._suvColor);
 
     // ---- contact shadow: a soft dark disc under the SUV so it reads planted ----
-    const contact = new THREE.Mesh(
+    this.contact = new THREE.Mesh(
       new THREE.CircleGeometry(2.2, 32),
       new THREE.MeshBasicMaterial({ map: makeRadialTexture(), color: 0x000000, transparent: true, opacity: 0.4, depthWrite: false }),
     );
-    contact.rotation.x = -Math.PI / 2;
-    contact.position.set(0, 0.02, 0);
-    contact.renderOrder = 1;
-    this.scene.add(contact);
+    this.contact.rotation.x = -Math.PI / 2;
+    this.contact.position.set(0, 0.02, 0);
+    this.contact.renderOrder = 1;
+    this.scene.add(this.contact);
 
     this._lastScroll = gameState.miles * SCROLL;
     this._fogNear = 80; this._fogFar = 200;
+    this._golden = gameState.biome === 'el_salvador' ? 1 : 0; // golden-hour blend for the coast
 
     this._initEnvironment(); // ocean / urban silhouette / dust devil
     this._initLandmarks();   // approaching city landmarks
@@ -385,7 +386,7 @@ export class ParallaxScene {
       new THREE.MeshStandardMaterial({ color: 0x1f6f93, roughness: 0.35, metalness: 0.2 }),
     );
     this.ocean.rotation.x = -Math.PI / 2;
-    this.ocean.position.set(180, -2, 120);
+    this.ocean.position.set(95, -2, 140); // far right, visible on the coastal approach
     this.ocean.visible = false;
     this.scene.add(this.ocean);
 
@@ -464,6 +465,7 @@ export class ParallaxScene {
       if (on) {
         lm.group.position.set(lm.side, lm.baseY, activeRem * 1.25); // negative once passed → behind camera
         if (lm.lava) updateParticleField(lm.lava, dt, true);
+        if (lm.smoke) updateParticleField(lm.smoke, dt, true);
       }
     }
   }
@@ -675,8 +677,9 @@ export class ParallaxScene {
     this._updateEnvironment(dt, s);
     this._updateLandmarks(dt, s);
 
-    // ---- time of day (el_salvador is locked to golden hour) ----
-    const tod = s.biome === 'el_salvador' ? 0.66 : s.timeOfDay;
+    // ---- time of day (el_salvador eases to a locked golden hour) ----
+    this._golden += ((s.biome === 'el_salvador' ? 1 : 0) - this._golden) * Math.min(1, dt * 1.2);
+    const tod = s.timeOfDay + (0.66 - s.timeOfDay) * this._golden;
     const dn = this._dayNight(tod);
 
     // directional sun: aim from elevation along the fixed azimuth bearing
@@ -711,6 +714,9 @@ export class ParallaxScene {
     // headlights / lamps (lamps are inert glass by day, glow at night)
     for (const hl of this.suv.headlights) hl.intensity = dn.night ? 2.4 : 0;
     for (const lamp of this.suv.lamps) lamp.material.emissiveIntensity = dn.night ? 1.4 : 0;
+
+    // contact shadow fades with the sun (faint at night, strongest at midday)
+    this.contact.material.opacity = 0.12 + 0.28 * Math.min(1, dn.int / 1.4);
 
     this.renderer.render(this.scene, this.camera);
   }
@@ -797,7 +803,7 @@ function buildLandmark(idx) {
   const add = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => {
     const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); group.add(m); return m;
   };
-  let side = 0, baseY = 0, lava = null;
+  let side = 0, baseY = 0, lava = null, smoke = null;
 
   switch (idx) {
     case 0: { // Los Angeles — Hollywood sign on a hill
@@ -851,7 +857,7 @@ function buildLandmark(idx) {
       lava = makeParticleField(70, 0xff7a1a, 1.4, true, 0.85);
       lava.position.set(0, 46, 0);
       group.add(lava);
-      const smoke = makeParticleField(50, 0x555049, 2.2, false, 0.35);
+      smoke = makeParticleField(50, 0x555049, 2.2, false, 0.35);
       smoke.position.set(0, 49, 0);
       group.add(smoke);
       break;
@@ -877,5 +883,5 @@ function buildLandmark(idx) {
       break;
     }
   }
-  return { group, side, baseY, lava };
+  return { group, side, baseY, lava, smoke };
 }

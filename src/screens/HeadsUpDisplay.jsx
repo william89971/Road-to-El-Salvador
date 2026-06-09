@@ -52,7 +52,8 @@ export default function HeadsUpDisplay({ onToggleMap, onTogglePause, onToggleMut
 
   const progress = Math.min(100, (g.miles / CONFIG.TOTAL_MILES) * 100);
 
-  const vibesLow = g.vibes <= 1;
+  const VIBES_MAX = 5;
+  const vibesLow = g.vibes <= VIBES_MAX * 0.2; // red below 20%, derived from max
 
   return (
     <>

@@ -44,7 +44,7 @@ export default function ShootingMinigameScreen({ biome, onDone }) {
           <div style={{ fontSize: 64 }}>⚠️</div>
           <div style={st.introTitle}>AMBUSH!</div>
           <div style={st.introSub}>Tap the threats before they reach your stack. Ammo = vibes × 3.</div>
-          <div style={st.introSub}>You have {Math.max(6, gameState.vibes * 3)} shots · ESC to flee</div>
+          <div style={st.introSub}>You have {Math.max(3, gameState.vibes * 3)} shots · ESC to flee</div>
         </div>
       )}
 

@@ -62,7 +62,7 @@ export default function CityStopShop({ index, onContinue }) {
         ) : (
           <>
             <div style={st.inflNote}>
-              Local prices inflated to <b>{Math.round(100 / (g.purchasingPower / 100))}%</b> · Cash ${Math.round(g.cash)}
+              Local inflation <b>+{Math.round(100 / (g.purchasingPower / 100) - 100)}%</b> · Cash ${Math.round(g.cash)}
             </div>
 
             <div style={st.services}>

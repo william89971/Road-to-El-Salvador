@@ -27,7 +27,7 @@ export default function NameBanner({ stop }) {
 const st = {
   wrap: {
     position: 'fixed', inset: 0, zIndex: 46, display: 'grid', placeItems: 'center',
-    pointerEvents: 'none', transition: 'opacity 0.6s ease',
+    pointerEvents: 'auto', transition: 'opacity 0.6s ease', // blocks HUD clicks during the cinematic
     background: 'radial-gradient(120% 60% at 50% 50%, rgba(26,20,17,0.55), rgba(26,20,17,0) 70%)',
   },
   inner: { textAlign: 'center', color: 'var(--paper)' },
