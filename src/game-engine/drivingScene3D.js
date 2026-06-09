@@ -5,7 +5,9 @@ import { createSUV } from './truckModel3D.js';
 
 // A true 3D driving scene: a perspective camera chases a fixed SUV while the
 // road, rolling terrain, props and mountains scroll toward it on a seamless
-// two-tile treadmill. Same exported class/interface as before, so
+// two-tile treadmill. A gradient sky dome, sun/stars, real shadows,
+// hemisphere + time-of-day lighting and procedural canvas textures give it a
+// realistic look. Same exported class/interface as before, so
 // GameController.jsx needs zero changes.
 
 const TILE = 600;          // length of one scrolling tile on the Z axis
@@ -16,7 +18,7 @@ const SCROLL = 5;          // world units scrolled per mile (driving-feel speed)
 const HILL_FREQ = Math.PI / 60; // z hill frequency: period 120 → exactly 5 per TILE,
                                 // so the terrain is periodic over TILE and the
                                 // treadmill wrap is perfectly seamless (no crease)
-const NIGHT_SKY = '#0a0814';
+const DEG = Math.PI / 180;
 
 // Rolling-hill height at a world (x,z). Ramped to 0 near the road so the
 // shoulders sit flat (no walls beside the road) and props rest on the surface.
@@ -25,17 +27,111 @@ function terrainHeight(x, z) {
   return Math.sin(x * 0.08) * Math.cos(z * HILL_FREQ) * 6 * ramp;
 }
 
-// lighten (amt>0) / darken (amt<0) a hex color, returns a THREE.Color
-function shade(hex, amt) {
-  const c = new THREE.Color(hex);
-  const f = amt < 0 ? 0 : 1, p = Math.abs(amt);
-  c.r += (f - c.r) * p; c.g += (f - c.g) * p; c.b += (f - c.b) * p;
-  return c;
-}
-
 // deterministic pseudo-random so both treadmill tiles share an identical
 // layout (props/mountains line up across the seam → invisible loop)
 function rand(seed) { const x = Math.sin(seed * 127.1) * 43758.5453; return x - Math.floor(x); }
+
+// ---- procedural canvas textures -----------------------------------------
+
+// Asphalt: dark base + fine noise speckle + faint horizontal grain.
+function makeRoadTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 512;
+  const g = c.getContext('2d');
+  g.fillStyle = '#2d2d2f';
+  g.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 9000; i++) {
+    const v = Math.random();
+    g.fillStyle = `rgba(${v > 0.5 ? '255,255,255' : '0,0,0'},0.10)`;
+    g.fillRect(Math.random() * 512, Math.random() * 512, 1, 1);
+  }
+  g.strokeStyle = 'rgba(0,0,0,0.06)';
+  g.lineWidth = 1;
+  for (let y = 0; y < 512; y += 6) {
+    g.beginPath(); g.moveTo(0, y + Math.random() * 2); g.lineTo(512, y + Math.random() * 2); g.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(2, 40);
+  return t;
+}
+
+// Neutral grayscale terrain detail: near-white base + soft blobs + speckles.
+// Multiplied by the (smoothly lerped) biome color so transitions stay smooth.
+function makeTerrainTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#f0f0f0';
+  g.fillRect(0, 0, 256, 256);
+  // soft darker patches
+  for (let i = 0; i < 40; i++) {
+    const x = Math.random() * 256, y = Math.random() * 256, r = 20 + Math.random() * 50;
+    const grd = g.createRadialGradient(x, y, 0, x, y, r);
+    const dark = i % 2 === 0;
+    grd.addColorStop(0, dark ? 'rgba(150,150,150,0.22)' : 'rgba(255,255,255,0.18)');
+    grd.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grd;
+    g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+  }
+  // fine speckles
+  for (let i = 0; i < 4000; i++) {
+    const v = Math.random();
+    g.fillStyle = `rgba(${v > 0.5 ? '200,200,200' : '255,255,255'},0.5)`;
+    g.fillRect(Math.random() * 256, Math.random() * 256, 1, 1);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(4, 20); // integer Y → tiles seamlessly across the treadmill seam
+  return t;
+}
+
+function makeStars() {
+  const N = 1000;
+  const pos = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    // upper hemisphere shell, just inside the dome
+    const u = Math.random(), v = Math.random() * 0.5; // v<0.5 → upper half
+    const theta = u * Math.PI * 2, phi = Math.acos(1 - 2 * v);
+    const r = 380;
+    pos[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
+    pos[i * 3 + 1] = r * Math.cos(phi);
+    pos[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.PointsMaterial({
+    color: 0xffffff, size: 1.6, sizeAttenuation: false,
+    transparent: true, opacity: 0, fog: false, depthWrite: false,
+  });
+  return new THREE.Points(geo, mat);
+}
+
+// ---- day/night keyframe model -------------------------------------------
+// Each frame's color fields are stored as THREE.Color (or a token); scalars as
+// numbers. The table is treated as circular so 0.85 → 0.00 wraps smoothly.
+const KF = [
+  { t: 0.00, dir: '#a0b4d0', int: 0.30, elev: -10, zen: '#050814', hor: '#0a0814', hemi: 0.15, sun: 0, stars: 1.0 },
+  { t: 0.10, dir: '#ffd9a0', int: 0.55, elev: 4,   zen: '#244a6e', hor: 'sky:#ff9e5e:0.5', hemi: 0.30, sun: 1, stars: 0.4 },
+  { t: 0.18, dir: '#ffe8c8', int: 1.10, elev: 18,  zen: '#1a3a5c', hor: 'sky', hemi: 0.45, sun: 1, stars: 0.0 },
+  { t: 0.30, dir: '#fff5e0', int: 1.40, elev: 38,  zen: '#1a3a5c', hor: 'sky', hemi: 0.50, sun: 1, stars: 0.0 },
+  { t: 0.55, dir: '#fff0d0', int: 1.25, elev: 28,  zen: '#1c3c5e', hor: 'sky', hemi: 0.48, sun: 1, stars: 0.0 },
+  { t: 0.66, dir: '#ff8c42', int: 0.90, elev: 10,  zen: '#2a3a6c', hor: 'sky:#ff8c42:0.6', hemi: 0.40, sun: 1, stars: 0.0 },
+  { t: 0.75, dir: '#ff6a3a', int: 0.55, elev: 2,   zen: '#122244', hor: 'sky:#ff6a3a:0.5', hemi: 0.30, sun: 1, stars: 0.25 },
+  { t: 0.85, dir: '#b0c0d8', int: 0.32, elev: -8,  zen: '#070a18', hor: '#0a0814', hemi: 0.18, sun: 0, stars: 0.85 },
+];
+// pre-parse color tokens
+for (const k of KF) {
+  k.dirC = new THREE.Color(k.dir);
+  k.zenC = new THREE.Color(k.zen);
+  if (k.hor.startsWith('sky')) {
+    const parts = k.hor.split(':'); // 'sky' | 'sky:#hex:amt'
+    k.horMode = parts.length === 1 ? 'sky' : 'skyMix';
+    if (k.horMode === 'skyMix') { k.horMixC = new THREE.Color(parts[1]); k.horMixAmt = parseFloat(parts[2]); }
+  } else { k.horMode = 'fixed'; k.horC = new THREE.Color(k.hor); }
+}
 
 export class ParallaxScene {
   constructor(canvas) {
@@ -45,6 +141,8 @@ export class ParallaxScene {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(this.width, this.height, false);
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     this.scene = new THREE.Scene();
 
@@ -55,33 +153,98 @@ export class ParallaxScene {
     this._t1 = new THREE.Color();
     this._t2 = new THREE.Color();
 
+    // reusable day/night output
+    this._dn = { dirC: new THREE.Color(), int: 1, elev: 30, zenC: new THREE.Color(), horC: new THREE.Color(), hemi: 0.5, sun: 1, stars: 0, night: false };
+
     // ---- camera: behind & above the SUV, looking slightly down toward it ----
     this.camera = new THREE.PerspectiveCamera(60, this.width / this.height, 0.1, 600);
     this.camera.position.set(0, 9, -15);
     this.camera.lookAt(0, 1, 14);
 
     // ---- lights ----
-    this.dirLight = new THREE.DirectionalLight(0xfff2d6, 1.2);
-    this.dirLight.position.set(-15, 30, 25); // upper-front
+    this.dirLight = new THREE.DirectionalLight(0xfff5e0, 1.4);
+    this._azimuth = new THREE.Vector3(-15, 0, 25).normalize(); // horizontal bearing of the sun
+    this.dirLight.castShadow = true;
+    const sc = this.dirLight.shadow.camera;
+    sc.left = -80; sc.right = 80; sc.top = 80; sc.bottom = -80;
+    sc.near = 1; sc.far = 300;
+    sc.updateProjectionMatrix();
+    this.dirLight.shadow.mapSize.set(1024, 1024);
+    this.dirLight.shadow.bias = -0.0005;
+    this.dirLight.shadow.normalBias = 0.02;
     this.scene.add(this.dirLight);
-    this.ambient = new THREE.AmbientLight(0xffffff, 0.4);
-    this.scene.add(this.ambient);
+    this.scene.add(this.dirLight.target); // keep target at origin
 
-    // ---- fog: matches sky, gives depth ----
+    this.hemi = new THREE.HemisphereLight(biome.sky, biome.mid, 0.5);
+    this.scene.add(this.hemi);
+
+    // ---- fog: matches the dome horizon, gives depth ----
     this.scene.fog = new THREE.Fog(biome.sky, 80, 200);
     this.renderer.setClearColor(biome.sky);
 
+    // ---- sky dome (gradient, immune to fog) ----
+    this.skyUniforms = {
+      uZenith: { value: new THREE.Color('#1a3a5c') },
+      uHorizon: { value: new THREE.Color(biome.sky) },
+      uExponent: { value: 0.6 },
+    };
+    const skyMat = new THREE.ShaderMaterial({
+      uniforms: this.skyUniforms,
+      side: THREE.BackSide,
+      depthWrite: false,
+      vertexShader: `
+        varying vec3 vWorldPos;
+        void main() {
+          vec4 wp = modelMatrix * vec4(position, 1.0);
+          vWorldPos = wp.xyz;
+          gl_Position = projectionMatrix * viewMatrix * wp;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uZenith;
+        uniform vec3 uHorizon;
+        uniform float uExponent;
+        varying vec3 vWorldPos;
+        void main() {
+          float h = normalize(vWorldPos - cameraPosition).y;
+          float f = pow(clamp(h, 0.0, 1.0), uExponent);
+          gl_FragColor = vec4(mix(uHorizon, uZenith, f), 1.0);
+          #include <colorspace_fragment>
+        }
+      `,
+    });
+    this.dome = new THREE.Mesh(new THREE.SphereGeometry(400, 32, 16), skyMat);
+    this.dome.renderOrder = -2;
+    this.dome.position.copy(this.camera.position);
+    this.scene.add(this.dome);
+
+    // ---- sun ----
+    this.sun = new THREE.Mesh(
+      new THREE.SphereGeometry(8, 16, 16),
+      new THREE.MeshBasicMaterial({ color: 0xfff3c0, fog: false, depthWrite: false }),
+    );
+    this.sun.renderOrder = -1;
+    this.scene.add(this.sun);
+
+    // ---- stars ----
+    this.stars = makeStars();
+    this.stars.renderOrder = -1;
+    this.stars.position.copy(this.camera.position);
+    this.scene.add(this.stars);
+
     // ---- shared materials (updated on biome change) ----
-    this.roadMat = new THREE.MeshLambertMaterial({ color: 0x3b3b3d });
-    this.dashMat = new THREE.MeshLambertMaterial({ color: 0xe8c54a, emissive: 0x3a2f00 });
-    this.terrainMat = new THREE.MeshLambertMaterial({ color: new THREE.Color(biome.mid) });
-    this.mountainMat = new THREE.MeshLambertMaterial({ color: shade(biome.mid, -0.35) });
-    this.propMat = new THREE.MeshLambertMaterial({ color: shade(biome.mid, -0.2) });
+    this.roadMat = new THREE.MeshLambertMaterial({ color: 0xffffff, map: makeRoadTexture() });
+    this.edgeMat = new THREE.MeshLambertMaterial({ color: 0xe8e8e0 });
+    this.dashMat = new THREE.MeshLambertMaterial({ color: 0xf5c518, emissive: 0x3a2c00 });
+    this.terrainMat = new THREE.MeshPhongMaterial({ color: new THREE.Color(biome.mid), map: makeTerrainTexture(), shininess: 8 });
+    this.mountainMat = new THREE.MeshPhongMaterial({ color: this.curMid.clone().multiplyScalar(0.6), shininess: 4 });
+    this.propMat = new THREE.MeshLambertMaterial({ color: this.curMid.clone().multiplyScalar(0.8) });
 
     // ---- shared geometries ----
     this.roadGeo = new THREE.PlaneGeometry(ROAD_W, TILE);
     this.roadGeo.rotateX(-Math.PI / 2);
-    this.dashGeo = new THREE.BoxGeometry(0.35, 0.06, 7);
+    this.edgeGeo = new THREE.BoxGeometry(0.3, 0.04, TILE);
+    this.dashGeo = new THREE.BoxGeometry(0.15, 0.06, 7);
     this.terrainGeoL = makeTerrainGeo(-TERRAIN_X);
     this.terrainGeoR = makeTerrainGeo(TERRAIN_X);
     this.coneGeo = new THREE.ConeGeometry(1, 1, 6);
@@ -124,29 +287,47 @@ export class ParallaxScene {
     this.suv = createSUV();
     this.suv.group.rotation.y = -Math.PI / 2;
     this.suv.group.position.set(0, 0, 0);
+    this.suv.group.traverse((o) => {
+      if (!o.isMesh) return;
+      if (o.material && o.material.transparent) { o.castShadow = false; o.receiveShadow = false; }
+      else { o.castShadow = true; o.receiveShadow = true; }
+    });
     this.scene.add(this.suv.group);
 
     this._lastScroll = gameState.miles * SCROLL;
 
     this._rebuildProps(); // initial props for the starting biome
+    this.update(0);       // prime lighting/sky for the starting time of day
   }
 
   _makeTile() {
     const tile = new THREE.Group();
 
     // road
-    tile.add(new THREE.Mesh(this.roadGeo, this.roadMat));
+    const road = new THREE.Mesh(this.roadGeo, this.roadMat);
+    road.receiveShadow = true;
+    tile.add(road);
 
-    // 20 dashed centerline strips, evenly spaced
+    // white edge lines
+    for (const sx of [-1, 1]) {
+      const edge = new THREE.Mesh(this.edgeGeo, this.edgeMat);
+      edge.position.set(sx * (ROAD_W / 2 - 0.25), 0.02, 0);
+      tile.add(edge);
+    }
+
+    // centerline: a crisp double-dashed line (center + flanking rows)
     for (let i = 0; i < 20; i++) {
-      const dash = new THREE.Mesh(this.dashGeo, this.dashMat);
-      dash.position.set(0, 0.04, -TILE / 2 + i * (TILE / 20) + TILE / 40);
-      tile.add(dash);
+      const z = -TILE / 2 + i * (TILE / 20) + TILE / 40;
+      for (const dx of [-0.4, 0, 0.4]) {
+        const dash = new THREE.Mesh(this.dashGeo, this.dashMat);
+        dash.position.set(dx, 0.03, z);
+        tile.add(dash);
+      }
     }
 
     // terrain tiles (left + right of the road)
-    const tl = new THREE.Mesh(this.terrainGeoL, this.terrainMat); tl.position.x = -TERRAIN_X; tile.add(tl);
-    const tr = new THREE.Mesh(this.terrainGeoR, this.terrainMat); tr.position.x = TERRAIN_X; tile.add(tr);
+    const tl = new THREE.Mesh(this.terrainGeoL, this.terrainMat); tl.position.x = -TERRAIN_X; tl.receiveShadow = true; tile.add(tl);
+    const tr = new THREE.Mesh(this.terrainGeoR, this.terrainMat); tr.position.x = TERRAIN_X; tr.receiveShadow = true; tile.add(tr);
 
     // mountains (far back, base seated on the ground)
     for (const m of this.mountainLayout) {
@@ -173,6 +354,8 @@ export class ParallaxScene {
       const mesh = new THREE.Mesh(geo, m);
       mesh.position.set(x, y, z);
       mesh.rotation.set(rx, ry, rz);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
       grp.add(mesh);
     };
     switch (type) {
@@ -218,6 +401,37 @@ export class ParallaxScene {
     }
   }
 
+  // interpolate the day/night keyframes for time t (0..1, circular) into this._dn
+  _dayNight(t) {
+    let a = KF[KF.length - 1], b = KF[0];
+    for (let i = 0; i < KF.length; i++) {
+      if (t < KF[i].t) { b = KF[i]; a = KF[(i - 1 + KF.length) % KF.length]; break; }
+      if (i === KF.length - 1) { a = KF[i]; b = KF[0]; }
+    }
+    let span = (b.t - a.t + 1) % 1; if (span === 0) span = 1;
+    const local = ((t - a.t + 1) % 1) / span;
+    const out = this._dn;
+    out.dirC.lerpColors(a.dirC, b.dirC, local);
+    out.zenC.lerpColors(a.zenC, b.zenC, local);
+    out.int = a.int + (b.int - a.int) * local;
+    out.elev = a.elev + (b.elev - a.elev) * local;
+    out.hemi = a.hemi + (b.hemi - a.hemi) * local;
+    out.stars = a.stars + (b.stars - a.stars) * local;
+    out.sun = a.sun + (b.sun - a.sun) * local;
+    this._horizonFor(a, this._t1); this._horizonFor(b, this._t2);
+    out.horC.lerpColors(this._t1, this._t2, local);
+    out.night = t >= 0.75 || t <= 0.10;
+    return out;
+  }
+
+  // resolve a keyframe's horizon color (may reference the lerped biome sky)
+  _horizonFor(k, target) {
+    if (k.horMode === 'fixed') target.copy(k.horC);
+    else if (k.horMode === 'sky') target.copy(this.curSky);
+    else target.copy(this.curSky).lerp(k.horMixC, k.horMixAmt);
+    return target;
+  }
+
   resize(w, h) {
     this.width = w; this.height = h;
     this.camera.aspect = w / h;
@@ -237,6 +451,8 @@ export class ParallaxScene {
     this.terrainMat.color.copy(this.curMid);
     this.mountainMat.color.copy(this.curMid).multiplyScalar(0.6);
     this.propMat.color.copy(this.curMid).multiplyScalar(0.8);
+    this.hemi.color.copy(this.curSky);
+    this.hemi.groundColor.copy(this.curMid);
 
     // seamless infinite scroll: two tiles leapfrog along Z as the world moves
     const scroll = s.miles * SCROLL;
@@ -249,24 +465,39 @@ export class ParallaxScene {
     this._lastScroll = scroll;
     for (const w of this.suv.wheels) w.rotation.z -= dScroll / 0.6;
 
-    // day/night
-    const t = s.timeOfDay;
-    const night = t >= 0.75 || t <= 0.1;
-    if (night) {
-      this.renderer.setClearColor(NIGHT_SKY);
-      this.scene.fog.color.set(NIGHT_SKY);
-      this.ambient.intensity = 0.12;
-      this.dirLight.intensity = 0.3;
-      for (const hl of this.suv.headlights) hl.intensity = 2.2;
-      for (const bm of this.suv.beams) bm.material.opacity = 0.3;
-    } else {
-      this.renderer.setClearColor(this.curSky);
-      this.scene.fog.color.copy(this.curSky);
-      this.ambient.intensity = 0.4;
-      this.dirLight.intensity = 1.2;
-      for (const hl of this.suv.headlights) hl.intensity = 0;
-      for (const bm of this.suv.beams) bm.material.opacity = 0;
-    }
+    // ---- time of day ----
+    const dn = this._dayNight(s.timeOfDay);
+
+    // directional sun: aim from elevation along the fixed azimuth bearing
+    const elev = dn.elev * DEG;
+    const ce = Math.cos(elev), se = Math.sin(elev);
+    this.dirLight.position.set(this._azimuth.x * ce, se, this._azimuth.z * ce).multiplyScalar(60);
+    // clamp the *shadow* direction to a min elevation so low-sun shadows don't stretch/acne
+    const shadowSe = Math.max(se, Math.sin(8 * DEG));
+    this.dirLight.position.y = shadowSe * 60; // raise only for shadow stability; visual sun uses its own mesh
+    this.dirLight.color.copy(dn.dirC);
+    this.dirLight.intensity = dn.int;
+    this.hemi.intensity = dn.hemi;
+
+    // sky dome + fog/clear horizon blend
+    this.skyUniforms.uZenith.value.copy(dn.zenC);
+    this.skyUniforms.uHorizon.value.copy(dn.horC);
+    this.scene.fog.color.copy(dn.horC);
+    this.renderer.setClearColor(dn.horC);
+    this.dome.position.copy(this.camera.position);
+    this.stars.position.copy(this.camera.position);
+
+    // sun mesh: along the (unclamped) sun direction so it can sit near the horizon
+    this.sun.visible = dn.sun > 0.01;
+    this.sun.position.set(this._azimuth.x * ce, se, this._azimuth.z * ce).multiplyScalar(350).add(this.camera.position);
+
+    // stars
+    this.stars.material.opacity = dn.stars;
+    this.stars.visible = dn.stars > 0.01;
+
+    // headlights / beams
+    for (const hl of this.suv.headlights) hl.intensity = dn.night ? 2.2 : 0;
+    for (const bm of this.suv.beams) bm.material.opacity = 0.3 * dn.stars;
 
     this.renderer.render(this.scene, this.camera);
   }
@@ -279,6 +510,7 @@ export class ParallaxScene {
         for (const mm of mats) { if (mm.map) mm.map.dispose(); mm.dispose(); }
       }
     });
+    this.dirLight.shadow.map?.dispose();
     this.renderer.dispose();
   }
 }
