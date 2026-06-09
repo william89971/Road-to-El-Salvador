@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { gameState, clamp } from '../game-engine/gameStateAndRules.js';
 import { ROUTE } from '../map-data/citiesAndRoute.js';
+import { FuelIcon } from './Icons.jsx';
 
 const BASES = { refuel: 40, repair: 80 };
 
@@ -66,7 +67,7 @@ export default function CityStopShop({ index, onContinue }) {
 
             <div style={st.services}>
               <Service
-                icon="⛽" label="Refuel" detail={g.gas >= 100 ? 'Tank full' : `Fill to 100%`}
+                icon={<FuelIcon size={26} />} label="Refuel" detail={g.gas >= 100 ? 'Tank full' : `Fill to 100%`}
                 price={refuelCost} disabled={g.gas >= 100 || g.cash < refuelCost}
                 onClick={() => buy('refuel')}
               />

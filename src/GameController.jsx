@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useReducer } from 'react';
-import { gameState, tick, resetGame, CONFIG } from './game-engine/gameStateAndRules.js';
+import { gameState, tick, resetGame, CONFIG, LOADOUTS } from './game-engine/gameStateAndRules.js';
 import { ROUTE, BIOMES } from './map-data/citiesAndRoute.js';
 import { ParallaxScene } from './game-engine/drivingScene3D.js';
 import { audio } from './game-engine/soundEffects.js';
@@ -13,6 +13,7 @@ import ShootingMinigameScreen from './screens/ShootingMinigameScreen.jsx';
 import RouteMapScreen from './screens/RouteMapScreen.jsx';
 import ArrivalCinematic from './screens/ArrivalCinematic.jsx';
 import LeaderboardScreen from './screens/LeaderboardScreen.jsx';
+import NameBanner from './screens/NameBanner.jsx';
 import { getEvent } from './events/eventGenerator.js';
 import { applyEffects } from './game-engine/gameStateAndRules.js';
 import { saveRun } from './game-engine/leaderboardStorage.js';
@@ -27,6 +28,8 @@ export default function GameController() {
   const [shooter, setShooter] = useState(null); // null | { source }
   const [muted, setMuted] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [nameBanner, setNameBanner] = useState(null); // ROUTE stop shown as a cinematic banner
+  const bannerTimerRef = useRef(null);
 
   // audio reaction bookkeeping
   const audioRef = useRef({ histLen: 1, btc: CONFIG.START_BTC_PRICE, gasAlarm: false, suvAlarm: false, engine: false });
@@ -140,10 +143,17 @@ export default function GameController() {
         gameState.currentCountry = stop.country;
         gameState.biome = stop.biome;
         // Open the city-stop modal for every stop except the final destination
-        // (San Salvador, which is handled by the arrival sequence).
+        // (San Salvador, which is handled by the arrival sequence). A name-banner
+        // cinematic plays first, then the shop opens.
         if (i < ROUTE.length - 1) {
           gameState.paused = true;
-          gameState.cityStopIndex = i;
+          setNameBanner(stop);
+          clearTimeout(bannerTimerRef.current);
+          bannerTimerRef.current = setTimeout(() => {
+            setNameBanner(null);
+            gameState.cityStopIndex = i;
+            forceRender();
+          }, 3000);
         }
         break;
       }
@@ -161,13 +171,15 @@ export default function GameController() {
     audioRef.current = { histLen: 1, btc: CONFIG.START_BTC_PRICE, gasAlarm: false, suvAlarm: false, engine: audioRef.current.engine };
   };
 
-  const handleStart = (name, difficulty) => {
+  const handleStart = (name, difficulty, loadout, suvColor) => {
     audio.init();
-    resetGame(name, difficulty);
+    resetGame(name, difficulty, loadout, suvColor);
     gameState.lastStopIndex = 0; // already at LA (index 0)
     gameState.cityStopIndex = -1;
     eventDataRef.current = null;
     setEventData(null);
+    clearTimeout(bannerTimerRef.current);
+    setNameBanner(null);
     resetAudioBookkeeping();
     forceRender();
   };
@@ -199,16 +211,18 @@ export default function GameController() {
   };
 
   const restart = () => {
-    resetGame(gameState.playerName, gameState.difficulty);
+    resetGame(gameState.playerName, gameState.difficulty, LOADOUTS[gameState.loadoutId], gameState.suvColor);
     gameState.lastStopIndex = 0;
     gameState.cityStopIndex = -1;
     eventDataRef.current = null;
     setEventData(null);
     setShooter(null);
+    clearTimeout(bannerTimerRef.current);
+    setNameBanner(null);
     resetAudioBookkeeping();
     forceRender();
   };
-  const toMenu = () => { gameState.screen = 'start'; setShooter(null); forceRender(); };
+  const toMenu = () => { gameState.screen = 'start'; setShooter(null); clearTimeout(bannerTimerRef.current); setNameBanner(null); forceRender(); };
 
   // ---- render ------------------------------------------------------------
   const s = gameState;
@@ -233,7 +247,8 @@ export default function GameController() {
             <ShootingMinigameScreen biome={gameState.biome} onDone={endShooter} />
           )}
           {showMap && <RouteMapScreen onClose={() => setShowMap(false)} />}
-          {s.paused && s.cityStopIndex < 0 && !eventData && (
+          {nameBanner && <NameBanner stop={nameBanner} />}
+          {s.paused && s.cityStopIndex < 0 && !eventData && !nameBanner && (
             <div style={styles.pauseOverlay} onClick={togglePause}>
               <div style={{ fontFamily: 'var(--font-title)', fontSize: 48 }}>PAUSED</div>
               <div style={{ fontFamily: 'var(--font-num)', fontSize: 14, opacity: 0.8 }}>click to resume</div>

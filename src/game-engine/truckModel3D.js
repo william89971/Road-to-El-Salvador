@@ -9,12 +9,15 @@ import * as THREE from 'three';
 //   wheels     – the 4 wheel Groups (scene spins them about X to roll)
 //   lamps      – the 2 emissive headlight spheres (scene drives emissive at night)
 //   headlights – the 2 forward PointLights (scene drives intensity at night)
-export function createSUV() {
+export function createSUV(bodyColor = 0x7a8c6e) {
   const group = new THREE.Group();
 
   // ---- materials ----
-  const bodyMat   = new THREE.MeshStandardMaterial({ color: 0x7a8c6e, roughness: 0.82, metalness: 0.12 }); // faded olive
-  const hoodMat   = new THREE.MeshStandardMaterial({ color: 0x6a7c5e, roughness: 0.85 });                  // slightly darker
+  const bodyMat   = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.82, metalness: 0.12 }); // body paint
+  const hoodMat   = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.85 });                  // slightly darker
+  hoodMat.color.multiplyScalar(0.82);
+  // recolor the painted panels (body + cab + hood) — called by the scene/preview
+  const setColor = (hex) => { bodyMat.color.set(hex); hoodMat.color.set(hex).multiplyScalar(0.82); };
   const trimMat   = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.9 });                   // bumpers/dark trim
   const rackMat   = new THREE.MeshStandardMaterial({ color: 0x36382f, roughness: 0.8, metalness: 0.4 });   // roof rack
   const tireMat   = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 1.0 });
@@ -115,5 +118,5 @@ export function createSUV() {
     headlights.push(pl);
   }
 
-  return { group, wheels, lamps, headlights };
+  return { group, wheels, lamps, headlights, setColor };
 }

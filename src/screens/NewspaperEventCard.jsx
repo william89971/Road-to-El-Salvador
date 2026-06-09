@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { FuelIcon, RigIcon, CrewIcon, CashIcon, BtcIcon } from './Icons.jsx';
 
 // Jagged "torn paper" top edge as a clip-path polygon string.
 function tornTop() {
@@ -59,18 +60,23 @@ export default function NewspaperEventCard({ event, onChoose, onFight }) {
   );
 }
 
+const EFFECT_ICONS = { gas: FuelIcon, suvHealth: RigIcon, vibes: CrewIcon, cash: CashIcon, btc: BtcIcon };
+
 function renderEffects(effects) {
   if (!effects) return null;
-  const map = { gas: '⛽', suvHealth: '🛻', vibes: '😎', cash: '💵', btc: '₿', purchasingPower: '📉' };
   const items = Object.entries(effects).filter(([, v]) => v);
   if (!items.length) return null;
   return (
     <div style={st.effects}>
-      {items.map(([k, v]) => (
-        <span key={k} style={{ ...st.effect, color: v > 0 ? '#2f7d4f' : 'var(--danger)' }}>
-          {map[k] || k} {v > 0 ? '+' : ''}{k === 'cash' ? `$${v}` : v}
-        </span>
-      ))}
+      {items.map(([k, v]) => {
+        const Icon = EFFECT_ICONS[k];
+        return (
+          <span key={k} style={{ ...st.effect, color: v > 0 ? '#2f7d4f' : 'var(--danger)' }}>
+            <span style={{ display: 'inline-flex', verticalAlign: '-2px' }}>{Icon ? <Icon size={15} /> : '📉'}</span>
+            {' '}{v > 0 ? '+' : ''}{k === 'cash' ? `$${v}` : v}
+          </span>
+        );
+      })}
     </div>
   );
 }

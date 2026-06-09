@@ -11,11 +11,22 @@ export const CONFIG = {
   EVENT_MAX_MS: 90000,
 };
 
+// starting loadouts (chosen on the start screen). cash is the base; the
+// difficulty multiplier still applies on top of it.
+export const LOADOUTS = {
+  backpacker:   { id: 'backpacker',   label: 'Backpacker',   cash: 400,  btc: 0.08, gas: 80,  blurb: 'Lean on cash, heavy on BTC.' },
+  road_warrior: { id: 'road_warrior', label: 'Road Warrior', cash: 800,  btc: 0.05, gas: 100, blurb: 'Balanced. The intended way.' },
+  cash_king:    { id: 'cash_king',    label: 'Cash King',    cash: 1400, btc: 0.01, gas: 100, blurb: 'Rich in fiat, poor in BTC — the hard way.' },
+};
+
 export const gameState = {
   screen: 'start',     // 'start' | 'playing' | 'gameover' | 'arrival' | 'victory'
   paused: false,
   playerName: '',
   difficulty: 'road_warrior', // 'tourist' | 'road_warrior' | 'satoshi'
+  suvColor: '#7a8c6e',        // chosen SUV paint
+  loadoutId: 'road_warrior',  // chosen starting loadout
+  startCash: 800,             // cash at the start of this run (for the HUD baseline)
 
   miles: 0,
   days: 0,
@@ -41,14 +52,16 @@ export const gameState = {
   gameoverReason: '',
 };
 
-export function resetGame(name, difficulty) {
+export function resetGame(name, difficulty, loadout = LOADOUTS.road_warrior, suvColor = '#7a8c6e') {
   const mult = difficulty === 'satoshi' ? 0.5 : difficulty === 'tourist' ? 1.5 : 1;
+  const lo = loadout || LOADOUTS.road_warrior;
+  const cash = Math.round(lo.cash * mult);
   Object.assign(gameState, {
-    screen: 'playing', paused: false, playerName: name, difficulty,
+    screen: 'playing', paused: false, playerName: name, difficulty, suvColor, loadoutId: lo.id,
     miles: 0, days: 0, currentCity: 'Los Angeles', currentCountry: 'USA',
     biome: 'california', timeOfDay: 0.35,
-    gas: 100, suvHealth: 100, vibes: 5,
-    cash: Math.round(CONFIG.START_CASH * mult), btc: CONFIG.START_BTC,
+    gas: lo.gas, suvHealth: 100, vibes: 5,
+    cash, startCash: cash, btc: lo.btc,
     btcPrice: CONFIG.START_BTC_PRICE, btcPriceHistory: [CONFIG.START_BTC_PRICE],
     purchasingPower: 100, recentEventTitles: [], lastStopIndex: -1,
     enemiesDefeated: 0, eventsSurvived: 0, gameoverReason: '',

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { gameState } from './gameStateAndRules.js';
-import { BIOMES } from '../map-data/citiesAndRoute.js';
+import { BIOMES, ROUTE } from '../map-data/citiesAndRoute.js';
 import { createSUV } from './truckModel3D.js';
 
 // A true 3D driving scene: a perspective camera chases a fixed SUV while the
@@ -174,7 +174,7 @@ export class ParallaxScene {
     this.scene = new THREE.Scene();
 
     const biome = BIOMES[gameState.biome] || BIOMES.california;
-    this.currentProp = biome.prop;
+    this.currentProp = gameState.biome; // props are keyed by biome name so all 8 are distinct
     this.curMid = new THREE.Color(biome.mid); // displayed colors, lerped toward the active biome
     this.curSky = new THREE.Color(biome.sky);
     this._t1 = new THREE.Color();
@@ -275,6 +275,16 @@ export class ParallaxScene {
     this.terrainMat = new THREE.MeshPhongMaterial({ color: new THREE.Color(biome.mid), map: makeTerrainTexture(), shininess: 8 });
     this.mountainMat = new THREE.MeshPhongMaterial({ color: this.curMid.clone().multiplyScalar(0.6), shininess: 4 });
     this.propMat = new THREE.MeshLambertMaterial({ color: this.curMid.clone().multiplyScalar(0.8) });
+    // fixed-color prop materials (natural colors, biome-independent)
+    this.matFoliage = new THREE.MeshStandardMaterial({ color: 0x3a5a32, roughness: 1 });
+    this.matFoliageDark = new THREE.MeshStandardMaterial({ color: 0x244a22, roughness: 1 });
+    this.matCactus = new THREE.MeshStandardMaterial({ color: 0x4a7a4a, roughness: 1 });
+    this.matTrunk = new THREE.MeshStandardMaterial({ color: 0x5a4632, roughness: 1 });
+    this.matRock = new THREE.MeshStandardMaterial({ color: 0x6e6a60, roughness: 1 });
+    this.matDark = new THREE.MeshStandardMaterial({ color: 0x2e2a26, roughness: 1 });
+    this.matSign = new THREE.MeshStandardMaterial({ color: 0xcfc7b0, roughness: 0.7 });
+    this.matScrub = new THREE.MeshStandardMaterial({ color: 0x5a6a3a, roughness: 1 });
+    this.matBanana = new THREE.MeshStandardMaterial({ color: 0x4e8a3a, roughness: 0.9, side: THREE.DoubleSide });
 
     // ---- shared geometries ----
     this.roadGeo = new THREE.PlaneGeometry(ROAD_W, TILE);
@@ -296,6 +306,21 @@ export class ParallaxScene {
       post: new THREE.CylinderGeometry(0.1, 0.1, 3, 6),
       board: new THREE.BoxGeometry(2.4, 1.3, 0.2),
       cone: new THREE.ConeGeometry(1.6, 4, 6),
+      // region-specific extras
+      palmCrown: new THREE.SphereGeometry(0.95, 8, 6),
+      saguaro: new THREE.CylinderGeometry(0.32, 0.42, 5.2, 8),
+      saguaroArm: new THREE.CylinderGeometry(0.18, 0.22, 1.7, 6),
+      rock: new THREE.BoxGeometry(1, 1, 1),
+      scrub: new THREE.SphereGeometry(0.6, 6, 5),
+      deadTrunk: new THREE.CylinderGeometry(0.12, 0.2, 3.6, 6),
+      branch: new THREE.BoxGeometry(0.1, 0.1, 1.3),
+      pole: new THREE.CylinderGeometry(0.1, 0.13, 6.5, 6),
+      crossbar: new THREE.BoxGeometry(2.4, 0.09, 0.09),
+      canopy: new THREE.ConeGeometry(1.9, 2.3, 7),
+      vine: new THREE.CylinderGeometry(0.05, 0.05, 2.4, 5),
+      banana: new THREE.PlaneGeometry(0.5, 1.6),
+      billboardLeg: new THREE.BoxGeometry(0.12, 4, 0.12),
+      billboardPanel: new THREE.BoxGeometry(3.2, 1.8, 0.15),
     };
 
     // ---- deterministic layouts shared by both tiles ----
@@ -330,6 +355,8 @@ export class ParallaxScene {
       else { o.castShadow = true; o.receiveShadow = true; }
     });
     this.scene.add(this.suv.group);
+    this._suvColor = gameState.suvColor;
+    this.suv.setColor(this._suvColor);
 
     // ---- contact shadow: a soft dark disc under the SUV so it reads planted ----
     const contact = new THREE.Mesh(
@@ -342,9 +369,102 @@ export class ParallaxScene {
     this.scene.add(contact);
 
     this._lastScroll = gameState.miles * SCROLL;
+    this._fogNear = 80; this._fogFar = 200;
 
-    this._rebuildProps(); // initial props for the starting biome
-    this.update(0);       // prime lighting/sky for the starting time of day
+    this._initEnvironment(); // ocean / urban silhouette / dust devil
+    this._initLandmarks();   // approaching city landmarks
+    this._rebuildProps();    // initial props for the starting biome
+    this.update(0);          // prime lighting/sky for the starting time of day
+  }
+
+  // ---- biome environment extras (toggled per biome in update) ----
+  _initEnvironment() {
+    // ocean far to the right (el_salvador)
+    this.ocean = new THREE.Mesh(
+      new THREE.PlaneGeometry(500, 700),
+      new THREE.MeshStandardMaterial({ color: 0x1f6f93, roughness: 0.35, metalness: 0.2 }),
+    );
+    this.ocean.rotation.x = -Math.PI / 2;
+    this.ocean.position.set(180, -2, 120);
+    this.ocean.visible = false;
+    this.scene.add(this.ocean);
+
+    // distant urban silhouette (central_mx)
+    this.urban = new THREE.Group();
+    const ub = new THREE.MeshStandardMaterial({ color: 0x3a4150, roughness: 1 });
+    for (let i = 0; i < 26; i++) {
+      const h = 6 + rand(i * 5.5) * 26;
+      const b = new THREE.Mesh(new THREE.BoxGeometry(4 + rand(i) * 4, h, 4), ub);
+      b.position.set(-90 + i * 7, h / 2, 230 + (i % 3) * 8);
+      this.urban.add(b);
+    }
+    this.urban.visible = false;
+    this.scene.add(this.urban);
+
+    // dust devil (sonora) — a swirling tan particle column off the roadside
+    this.dust = makeParticleField(140, 0xcdb98a, 0.7, false, 0.5);
+    this.dust.position.set(-26, 0, 70);
+    this.dust.visible = false;
+    this._dustData = this.dust.userData.data;
+    this.scene.add(this.dust);
+  }
+
+  _updateEnvironment(dt, s) {
+    const jungle = s.biome === 's_mexico';
+    const coast = s.biome === 'el_salvador';
+    // fog density: tighter mist in the jungle
+    const tn = jungle ? 35 : 80, tf = jungle ? 110 : 200;
+    this._fogNear += (tn - this._fogNear) * Math.min(1, dt * 1.5);
+    this._fogFar += (tf - this._fogFar) * Math.min(1, dt * 1.5);
+    this.scene.fog.near = this._fogNear; this.scene.fog.far = this._fogFar;
+
+    this.ocean.visible = coast;
+    if (coast) this.ocean.material.color.set(0x1f6f93);
+    this.urban.visible = s.biome === 'central_mx';
+
+    // dust devil swirl
+    this.dust.visible = s.biome === 'sonora';
+    if (this.dust.visible) {
+      const pos = this.dust.geometry.attributes.position;
+      for (let i = 0; i < this._dustData.length; i++) {
+        const d = this._dustData[i];
+        d.a += dt * (2.4 - d.r * 0.15);
+        d.y += dt * (2 + d.r * 0.3);
+        if (d.y > 9) { d.y = 0; d.r = 0.3 + Math.random() * 1.6; }
+        const rr = d.r * (0.4 + d.y / 9);
+        pos.setXYZ(i, Math.cos(d.a) * rr, d.y, Math.sin(d.a) * rr);
+      }
+      pos.needsUpdate = true;
+    }
+  }
+
+  // ---- approaching city landmarks ----
+  _initLandmarks() {
+    this.landmarks = ROUTE.map((_, i) => {
+      const lm = buildLandmark(i);
+      lm.group.visible = false;
+      this.scene.add(lm.group);
+      return lm; // { group, side, baseY, lava? }
+    });
+  }
+
+  _updateLandmarks(dt, s) {
+    // find the nearest upcoming city within 200 miles
+    let active = -1;
+    for (let i = 0; i < ROUTE.length; i++) {
+      const rem = ROUTE[i].mile - s.miles;
+      if (rem >= -3 && rem <= 200) { active = i; break; }
+    }
+    for (let i = 0; i < this.landmarks.length; i++) {
+      const lm = this.landmarks[i];
+      const on = i === active;
+      lm.group.visible = on;
+      if (on) {
+        const rem = Math.max(0, ROUTE[i].mile - s.miles);
+        lm.group.position.set(lm.side, lm.baseY, rem * 1.25);
+        if (lm.lava) updateParticleField(lm.lava, dt, true);
+      }
+    }
   }
 
   _makeTile() {
@@ -396,59 +516,90 @@ export class ParallaxScene {
     return tile;
   }
 
-  // build one prop mesh for the current biome's prop type
-  _propMesh(type) {
+  // build one region-specific prop for `biome`. `variant` (0..2, deterministic
+  // per layout slot) gives variety within a biome.
+  _propMesh(biome, variant) {
     const g = this.propGeo;
-    const m = this.propMat;
     const grp = new THREE.Group();
-    const add = (geo, x, y, z, rx = 0, ry = 0, rz = 0) => {
-      const mesh = new THREE.Mesh(geo, m);
+    const add = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) => {
+      const mesh = new THREE.Mesh(geo, mat);
       mesh.position.set(x, y, z);
       mesh.rotation.set(rx, ry, rz);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
+      mesh.scale.set(sx, sy, sz);
+      mesh.castShadow = true; mesh.receiveShadow = true;
       grp.add(mesh);
     };
-    switch (type) {
-      case 'cactus':
-        add(g.cyl, 0, 2, 0);
-        add(g.arm, -0.5, 2.2, 0, 0, 0, 0.4);
-        add(g.arm, 0.5, 1.8, 0, 0, 0, -0.4);
+    const palm = () => { add(g.palmTrunk, this.matTrunk, 0, 2.1, 0); for (let a = 0; a < 5; a++) add(g.leaf, this.matFoliage, 0, 4.1, 0, 0.2, (a / 5) * Math.PI * 2, 0.5); };
+    const tree = (mat = this.matFoliage) => { add(g.trunk, this.matTrunk, 0, 1.3, 0); add(g.bush, mat, 0, 3.3, 0); };
+    const rockCluster = () => { add(g.rock, this.matRock, 0, 0.5, 0, 0.2, 0.5, 0.1, 1.6, 1, 1.3); add(g.rock, this.matRock, 0.8, 0.35, 0.4, 0, 0.8, 0, 0.9, 0.7, 0.9); };
+    const scrub = () => { for (let i = 0; i < 3; i++) add(g.scrub, this.matScrub, (i - 1) * 0.5, 0.4, (i % 2) * 0.4, 0, 0, 0, 1, 0.7, 1); };
+
+    switch (biome) {
+      case 'california': // palms + highway signs + billboards
+        if (variant === 0) { add(g.palmTrunk, this.matTrunk, 0, 2.6, 0, 0, 0, 0, 1, 1.3, 1); add(g.palmCrown, this.matFoliage, 0, 5.4, 0, 0, 0, 0, 1.3, 1, 1.3); }
+        else if (variant === 1) { add(g.post, this.matDark, 0, 1.5, 0); add(g.board, this.matSign, 0, 2.9, 0); }
+        else { add(g.billboardLeg, this.matDark, -1.4, 2, 0); add(g.billboardLeg, this.matDark, 1.4, 2, 0); add(g.billboardPanel, this.matSign, 0, 4, 0); }
         break;
-      case 'tree':
-        add(g.trunk, 0, 1.3, 0);
-        add(g.bush, 0, 3.3, 0);
+      case 'baja': // saguaro + rocky outcrops + scrub
+        if (variant === 0) { add(g.saguaro, this.matCactus, 0, 2.6, 0); add(g.saguaroArm, this.matCactus, -0.45, 3, 0, 0, 0, 0.5); add(g.saguaroArm, this.matCactus, 0.45, 2.6, 0, 0, 0, -0.5); add(g.saguaroArm, this.matCactus, -0.45, 3.6, 0, Math.PI / 2, 0, 0); }
+        else if (variant === 1) rockCluster();
+        else scrub();
         break;
-      case 'palm':
-        add(g.palmTrunk, 0, 2.1, 0);
-        for (let a = 0; a < 5; a++) add(g.leaf, 0, 4.1, 0, 0.2, (a / 5) * Math.PI * 2, 0.5);
+      case 'sonora': // sparse scrub + rocks + dead trees
+        if (variant === 0) scrub();
+        else if (variant === 1) rockCluster();
+        else { add(g.deadTrunk, this.matDark, 0, 1.8, 0); add(g.branch, this.matDark, 0.3, 3, 0, 0, 0.6, 0.7); add(g.branch, this.matDark, -0.3, 2.6, 0, 0, -0.6, -0.7); }
         break;
-      case 'building':
-        add(g.box, 0, 3, 0);
+      case 'central_mx': // denser trees + power-line poles
+        if (variant === 2) { add(g.pole, this.matDark, 0, 3.2, 0); add(g.crossbar, this.matDark, 0, 5.8, 0); add(g.crossbar, this.matDark, 0, 5.2, 0); }
+        else tree(this.matFoliage);
         break;
-      case 'sign':
-        add(g.post, 0, 1.5, 0);
-        add(g.board, 0, 2.7, 0);
+      case 's_mexico': // dense jungle: layered canopy trees + vines
+        add(g.trunk, this.matTrunk, 0, 1.6, 0, 0, 0, 0, 1, 1.4, 1);
+        add(g.canopy, this.matFoliageDark, 0, 3.6, 0, 0, 0, 0, 1.2, 1, 1.2);
+        add(g.canopy, this.matFoliage, 0, 4.7, 0, 0, 0.5, 0, 0.85, 0.9, 0.85);
+        if (variant === 1) { add(g.vine, this.matFoliageDark, 0.7, 2.6, 0.2); add(g.vine, this.matFoliageDark, -0.6, 2.4, -0.2); }
         break;
-      case 'volcano':
+      case 'guatemala': // dark dense trees + rocks
+        if (variant === 1) rockCluster();
+        else { tree(this.matFoliageDark); }
+        break;
+      case 'honduras': // tropical palms + banana leaves (lush)
+        if (variant === 2) { add(g.trunk, this.matTrunk, 0, 0.9, 0, 0, 0, 0, 0.6, 0.6, 0.6); for (let a = 0; a < 5; a++) add(g.banana, this.matBanana, 0, 1.6, 0, -0.9, (a / 5) * Math.PI * 2, 0, 1.4, 1.4, 1.4); }
+        else palm();
+        break;
+      case 'el_salvador': // coastal palms
       default:
-        add(g.cone, 0, 2, 0);
+        palm();
         break;
     }
     return grp;
   }
 
+  // per-biome relative density (fraction of the 30 layout slots that render)
+  _density(biome) {
+    if (biome === 's_mexico' || biome === 'honduras' || biome === 'guatemala' || biome === 'central_mx') return 1;
+    if (biome === 'sonora') return 0.45;
+    if (biome === 'baja' || biome === 'california') return 0.7;
+    return 0.8;
+  }
+
   // refill props in both tiles from the shared layout
   _rebuildProps() {
+    const biome = this.currentProp;
+    const keep = Math.round(this.propLayout.length * this._density(biome));
     for (const tile of this.tiles) {
       const props = tile.userData.props;
       props.clear();
-      for (const p of this.propLayout) {
-        const prop = this._propMesh(this.currentProp);
+      this.propLayout.forEach((p, idx) => {
+        if (idx >= keep) return;
+        const variant = idx % 3;
+        const prop = this._propMesh(biome, variant);
         prop.position.set(p.x, terrainHeight(p.x, p.z), p.z);
+        prop.rotation.y = (idx * 1.7) % (Math.PI * 2);
         prop.scale.setScalar(p.s);
         props.add(prop);
-      }
+      });
     }
   }
 
@@ -494,11 +645,14 @@ export class ParallaxScene {
     const s = gameState;
     const b = BIOMES[s.biome] || BIOMES.california;
 
+    // apply a newly-chosen SUV color (picked on the start screen)
+    if (s.suvColor !== this._suvColor) { this._suvColor = s.suvColor; this.suv.setColor(this._suvColor); }
+
     // smoothly lerp biome colors (terrain / mountains / props / sky / fog)
     const k = 1 - Math.exp(-dt / 0.8);
     this.curMid.lerp(this._t1.set(b.mid), k);
     this.curSky.lerp(this._t2.set(b.sky), k);
-    if (b.prop !== this.currentProp) { this.currentProp = b.prop; this._rebuildProps(); }
+    if (s.biome !== this.currentProp) { this.currentProp = s.biome; this._rebuildProps(); }
     this.terrainMat.color.copy(this.curMid);
     this.mountainMat.color.copy(this.curMid).multiplyScalar(0.6);
     this.propMat.color.copy(this.curMid).multiplyScalar(0.8);
@@ -516,8 +670,13 @@ export class ParallaxScene {
     this._lastScroll = scroll;
     for (const w of this.suv.wheels) w.rotation.x -= dScroll / 0.6;
 
-    // ---- time of day ----
-    const dn = this._dayNight(s.timeOfDay);
+    // biome environment extras + approaching landmarks
+    this._updateEnvironment(dt, s);
+    this._updateLandmarks(dt, s);
+
+    // ---- time of day (el_salvador is locked to golden hour) ----
+    const tod = s.biome === 'el_salvador' ? 0.66 : s.timeOfDay;
+    const dn = this._dayNight(tod);
 
     // directional sun: aim from elevation along the fixed azimuth bearing
     const elev = dn.elev * DEG;
@@ -580,4 +739,142 @@ function makeTerrainGeo(offsetX) {
   pos.needsUpdate = true;
   g.computeVertexNormals();
   return g;
+}
+
+// ---- particles --------------------------------------------------------------
+function makeParticleField(count, color, size, additive, opacity = 0.7) {
+  const pos = new Float32Array(count * 3);
+  const data = [];
+  for (let i = 0; i < count; i++) {
+    const a = Math.random() * Math.PI * 2, r = 0.3 + Math.random() * 1.6, y = Math.random() * 9;
+    data.push({ a, r, y, vy: 1.2 + Math.random() * 2.4 });
+    pos[i * 3] = Math.cos(a) * r; pos[i * 3 + 1] = y; pos[i * 3 + 2] = Math.sin(a) * r;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.PointsMaterial({
+    color, size, transparent: true, opacity, depthWrite: false, fog: false,
+    blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+  });
+  const pts = new THREE.Points(geo, mat);
+  pts.userData.data = data;
+  return pts;
+}
+
+function updateParticleField(field, dt, rise) {
+  const data = field.userData.data;
+  const pos = field.geometry.attributes.position;
+  for (let i = 0; i < data.length; i++) {
+    const d = data[i];
+    d.y += d.vy * dt * (rise ? 1 : 0.3);
+    if (d.y > 9) { d.y = 0; d.r = 0.3 + Math.random() * 1.4; d.a = Math.random() * Math.PI * 2; }
+    const rr = d.r * (1 - d.y / 16);
+    pos.setXYZ(i, Math.cos(d.a) * rr, d.y, Math.sin(d.a) * rr);
+  }
+  pos.needsUpdate = true;
+}
+
+// ---- city landmarks (Three.js primitives) -----------------------------------
+function makeBtcTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#1a1411'; g.fillRect(0, 0, 256, 256);
+  g.fillStyle = '#f7931a';
+  g.font = 'bold 180px Georgia, serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('₿', 128, 138);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+// returns { group, side, baseY, lava? }
+function buildLandmark(idx) {
+  const group = new THREE.Group();
+  const M = (hex, opts = {}) => new THREE.MeshStandardMaterial({ color: hex, roughness: opts.r ?? 0.9, metalness: opts.m ?? 0, emissive: opts.e ?? 0x000000, emissiveIntensity: opts.ei ?? 0 });
+  const add = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => {
+    const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); group.add(m); return m;
+  };
+  let side = 0, baseY = 0, lava = null;
+
+  switch (idx) {
+    case 0: { // Los Angeles — Hollywood sign on a hill
+      side = -55; baseY = 0;
+      const hill = M(0x6f5a3a);
+      add(new THREE.BoxGeometry(60, 18, 26), hill, 0, 7, 0, 0.12, 0, 0);
+      const white = M(0xeeeeea, { e: 0x222222, ei: 0.2 });
+      const letters = 'HOLLYWOOD';
+      for (let i = 0; i < letters.length; i++) add(new THREE.BoxGeometry(2.6, 7, 0.6), white, -22 + i * 5.5, 17, 12, -0.1, 0, 0);
+      break;
+    }
+    case 1: { // Tijuana — arch gateway over the road (flag colors)
+      side = 0; baseY = 0;
+      const green = M(0x2e8b57), white = M(0xeeeeea), red = M(0xb02a2a);
+      add(new THREE.BoxGeometry(3, 22, 3), green, -9, 11, 0);
+      add(new THREE.BoxGeometry(3, 22, 3), red, 9, 11, 0);
+      add(new THREE.BoxGeometry(24, 3, 3), white, 0, 21, 0);
+      add(new THREE.BoxGeometry(24, 1.4, 3.4), green, 0, 22.6, 0);
+      add(new THREE.BoxGeometry(24, 1.4, 3.4), red, 0, 19.4, 0);
+      break;
+    }
+    case 2: { // Hermosillo — cathedral dome
+      side = 40; baseY = 0;
+      const cream = M(0xddd2b0);
+      add(new THREE.BoxGeometry(20, 14, 16), cream, 0, 7, 0);
+      add(new THREE.SphereGeometry(8, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2), cream, 0, 14, 0);
+      add(new THREE.ConeGeometry(1.2, 4, 8), M(0xc9a23a, { m: 0.5 }), 0, 23, 0);
+      break;
+    }
+    case 3: { // Mexico City — Angel of Independence column
+      side = 30; baseY = 0;
+      const stone = M(0xe6e0cf);
+      add(new THREE.BoxGeometry(8, 4, 8), stone, 0, 2, 0);
+      add(new THREE.CylinderGeometry(1.6, 2, 30, 12), stone, 0, 19, 0);
+      const gold = M(0xd4af37, { m: 0.6, e: 0x4a3a00, ei: 0.3 });
+      add(new THREE.BoxGeometry(2, 3, 1.4), gold, 0, 36, 0);
+      add(new THREE.BoxGeometry(0.3, 4, 2.6), gold, -1.4, 37, 0, 0, 0, 0.5);
+      add(new THREE.BoxGeometry(0.3, 4, 2.6), gold, 1.4, 37, 0, 0, 0, -0.5);
+      break;
+    }
+    case 4: { // Oaxaca — stepped pyramid
+      side = -42; baseY = 0;
+      const stone = M(0x8d8576);
+      for (let i = 0; i < 5; i++) { const w = 30 - i * 5; add(new THREE.BoxGeometry(w, 4, w), stone, 0, 2 + i * 4, 0); }
+      break;
+    }
+    case 5: { // Guatemala City — active volcano with lava glow
+      side = -55; baseY = 0;
+      add(new THREE.ConeGeometry(34, 46, 24), M(0x2a2622), 0, 23, 0);
+      add(new THREE.ConeGeometry(6, 6, 16), M(0x3a1a10, { e: 0xff5a10, ei: 0.6 }), 0, 45, 0);
+      lava = makeParticleField(70, 0xff7a1a, 1.4, true, 0.85);
+      lava.position.set(0, 46, 0);
+      group.add(lava);
+      const smoke = makeParticleField(50, 0x555049, 2.2, false, 0.35);
+      smoke.position.set(0, 49, 0);
+      group.add(smoke);
+      break;
+    }
+    case 6: { // Tegucigalpa — fortress wall with crenellations
+      side = 34; baseY = 0;
+      const stone = M(0x7a6f5c);
+      add(new THREE.BoxGeometry(46, 12, 6), stone, 0, 6, 0);
+      for (let i = 0; i < 10; i++) add(new THREE.BoxGeometry(2.6, 3, 6), stone, -20 + i * 4.5, 13, 0);
+      add(new THREE.BoxGeometry(8, 16, 7), stone, -18, 8, 0);
+      add(new THREE.BoxGeometry(8, 16, 7), stone, 18, 8, 0);
+      break;
+    }
+    case 7: // San Salvador — Bitcoin obelisk
+    default: {
+      side = 0; baseY = 0;
+      const stone = M(0xe4e4e0, { m: 0.2, r: 0.5 });
+      add(new THREE.BoxGeometry(6, 4, 6), stone, 0, 2, 0);
+      add(new THREE.BoxGeometry(4, 30, 4), stone, 0, 19, 0);
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 3.6), new THREE.MeshBasicMaterial({ map: makeBtcTexture() }));
+      face.position.set(0, 22, 2.05);
+      group.add(face);
+      break;
+    }
+  }
+  return { group, side, baseY, lava };
 }
