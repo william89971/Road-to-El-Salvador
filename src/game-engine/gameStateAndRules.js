@@ -22,7 +22,7 @@ export const gameState = {
   currentCity: 'Los Angeles',
   currentCountry: 'USA',
   biome: 'california',
-  timeOfDay: 0,        // 0..1, drives day/night
+  timeOfDay: 0.35,     // 0..1, drives day/night (0.35 = midday so LA starts sunny)
 
   gas: 100,
   suvHealth: 100,
@@ -46,7 +46,7 @@ export function resetGame(name, difficulty) {
   Object.assign(gameState, {
     screen: 'playing', paused: false, playerName: name, difficulty,
     miles: 0, days: 0, currentCity: 'Los Angeles', currentCountry: 'USA',
-    biome: 'california', timeOfDay: 0,
+    biome: 'california', timeOfDay: 0.35,
     gas: 100, suvHealth: 100, vibes: 5,
     cash: Math.round(CONFIG.START_CASH * mult), btc: CONFIG.START_BTC,
     btcPrice: CONFIG.START_BTC_PRICE, btcPriceHistory: [CONFIG.START_BTC_PRICE],

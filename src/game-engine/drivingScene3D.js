@@ -320,9 +320,9 @@ export class ParallaxScene {
     this.tiles = [this._makeTile(), this._makeTile()];
     this.tiles.forEach((t) => this.scene.add(t));
 
-    // ---- the SUV (fixed in world space, facing down the road = +Z) ----
+    // ---- the SUV (fixed in world space; the model already faces down the road = +Z) ----
     this.suv = createSUV();
-    this.suv.group.rotation.y = -Math.PI / 2;
+    this.suv.group.rotation.y = 0;
     this.suv.group.position.set(0, 0, 0);
     this.suv.group.traverse((o) => {
       if (!o.isMesh) return;
@@ -511,10 +511,10 @@ export class ParallaxScene {
     this.tiles[0].position.z = -offset;
     this.tiles[1].position.z = TILE - offset;
 
-    // spin wheels to match the road motion (stops when the SUV is stopped)
+    // spin wheels to match the road motion (axle is along X) — stops when stopped
     const dScroll = scroll - this._lastScroll;
     this._lastScroll = scroll;
-    for (const w of this.suv.wheels) w.rotation.z -= dScroll / 0.6;
+    for (const w of this.suv.wheels) w.rotation.x -= dScroll / 0.6;
 
     // ---- time of day ----
     const dn = this._dayNight(s.timeOfDay);
@@ -548,10 +548,9 @@ export class ParallaxScene {
     this.stars.material.opacity = dn.stars;
     this.stars.visible = dn.stars > 0.01;
 
-    // headlights / lamps / beams (lamps are inert glass by day, glow at night)
-    for (const hl of this.suv.headlights) hl.intensity = dn.night ? 2.2 : 0;
+    // headlights / lamps (lamps are inert glass by day, glow at night)
+    for (const hl of this.suv.headlights) hl.intensity = dn.night ? 2.4 : 0;
     for (const lamp of this.suv.lamps) lamp.material.emissiveIntensity = dn.night ? 1.4 : 0;
-    for (const bm of this.suv.beams) bm.material.opacity = 0.3 * dn.stars;
 
     this.renderer.render(this.scene, this.camera);
   }
