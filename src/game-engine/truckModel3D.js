@@ -15,7 +15,9 @@ export function createSUV() {
   const glassMat = new THREE.MeshStandardMaterial({
     color: 0xbfe0ea, roughness: 0.2, metalness: 0.1, transparent: true, opacity: 0.55,
   });
-  const lampMat = new THREE.MeshStandardMaterial({ color: 0xffe9a8, emissive: 0xffcc55, emissiveIntensity: 1.4 });
+  // emissiveIntensity 0 by default = inert glass in daylight; the scene drives
+  // it up at night (see drivingScene3D update()).
+  const lampMat = new THREE.MeshStandardMaterial({ color: 0xffe9a8, emissive: 0xffcc55, emissiveIntensity: 0 });
 
   // Main body
   const body = new THREE.Mesh(new THREE.BoxGeometry(3.4, 1.7, 1.9), bodyMat);
@@ -101,10 +103,12 @@ export function createSUV() {
   // Headlights (lamps + PointLights + glow beams), off in daytime
   const headlights = [];
   const beams = [];
+  const lamps = [];
   for (const dz of [0.6, -0.6]) {
     const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 12), lampMat);
     lamp.position.set(2.02, 1.45, dz);
     group.add(lamp);
+    lamps.push(lamp);
 
     const light = new THREE.PointLight(0xffd27a, 0, 9, 2);
     light.position.set(2.4, 1.5, dz);
@@ -120,5 +124,5 @@ export function createSUV() {
     beams.push(beam);
   }
 
-  return { group, wheels, headlights, beams };
+  return { group, wheels, headlights, beams, lamps };
 }

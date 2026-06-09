@@ -15,16 +15,22 @@ const ROAD_W = 14;         // road width
 const TERRAIN_W = 120;     // each terrain tile width
 const TERRAIN_X = 67;      // terrain tile center offset (road half 7 + terrain half 60)
 const SCROLL = 5;          // world units scrolled per mile (driving-feel speed)
-const HILL_FREQ = Math.PI / 60; // z hill frequency: period 120 → exactly 5 per TILE,
-                                // so the terrain is periodic over TILE and the
-                                // treadmill wrap is perfectly seamless (no crease)
+// z hill frequencies snapped to N·π/300 so every cos(z·f) is periodic over
+// TILE=600 → the treadmill wrap stays seamless (no slope crease at the seam).
+const HZ1 = 4 * Math.PI / 300;   // ≈0.0419 (large rolling hills)
+const HZ2 = 14 * Math.PI / 300;  // ≈0.1466 (medium variation)
+const HZ3 = 33 * Math.PI / 300;  // ≈0.3456 (fine surface roughness)
 const DEG = Math.PI / 180;
 
-// Rolling-hill height at a world (x,z). Ramped to 0 near the road so the
-// shoulders sit flat (no walls beside the road) and props rest on the surface.
+// Layered-octave hill height at a world (x,z): big rolling hills + medium
+// variation + fine roughness, so it reads as landscape rather than a sine wave.
+// Ramped to 0 near the road so the shoulders sit flat and props rest on it.
 function terrainHeight(x, z) {
   const ramp = Math.min(1, Math.max(0, (Math.abs(x) - ROAD_W / 2) / 25));
-  return Math.sin(x * 0.08) * Math.cos(z * HILL_FREQ) * 6 * ramp;
+  const h = Math.sin(x * 0.06) * Math.cos(z * HZ1) * 5
+          + Math.sin(x * 0.18) * Math.cos(z * HZ2) * 2
+          + Math.sin(x * 0.40) * Math.cos(z * HZ3) * 0.8;
+  return h * ramp;
 }
 
 // deterministic pseudo-random so both treadmill tiles share an identical
@@ -33,22 +39,26 @@ function rand(seed) { const x = Math.sin(seed * 127.1) * 43758.5453; return x - 
 
 // ---- procedural canvas textures -----------------------------------------
 
-// Asphalt: dark base + fine noise speckle + faint horizontal grain.
+// Asphalt: mid-grey base + high-contrast speckle + directional grain so it
+// reads as a textured surface in daylight rather than a black void.
 function makeRoadTexture() {
   const c = document.createElement('canvas');
   c.width = c.height = 512;
   const g = c.getContext('2d');
-  g.fillStyle = '#2d2d2f';
+  g.fillStyle = '#484849';
   g.fillRect(0, 0, 512, 512);
-  for (let i = 0; i < 9000; i++) {
-    const v = Math.random();
-    g.fillStyle = `rgba(${v > 0.5 ? '255,255,255' : '0,0,0'},0.10)`;
+  // high-contrast speckle: dark grit + bright glints
+  for (let i = 0; i < 11000; i++) {
+    const dark = Math.random() > 0.45;
+    g.fillStyle = dark ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.15)';
     g.fillRect(Math.random() * 512, Math.random() * 512, 1, 1);
   }
-  g.strokeStyle = 'rgba(0,0,0,0.06)';
-  g.lineWidth = 1;
-  for (let y = 0; y < 512; y += 6) {
-    g.beginPath(); g.moveTo(0, y + Math.random() * 2); g.lineTo(512, y + Math.random() * 2); g.stroke();
+  // directional grain (lengthwise streaks of varied tone)
+  for (let i = 0; i < 220; i++) {
+    const y = Math.random() * 512;
+    g.strokeStyle = Math.random() > 0.5 ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.05)';
+    g.lineWidth = 1;
+    g.beginPath(); g.moveTo(0, y); g.lineTo(512, y + (Math.random() * 2 - 1)); g.stroke();
   }
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
@@ -65,26 +75,43 @@ function makeTerrainTexture() {
   const g = c.getContext('2d');
   g.fillStyle = '#f0f0f0';
   g.fillRect(0, 0, 256, 256);
-  // soft darker patches
-  for (let i = 0; i < 40; i++) {
-    const x = Math.random() * 256, y = Math.random() * 256, r = 20 + Math.random() * 50;
+  // darker patches (stronger so detail is clearly visible on lit terrain)
+  for (let i = 0; i < 44; i++) {
+    const x = Math.random() * 256, y = Math.random() * 256, r = 18 + Math.random() * 52;
     const grd = g.createRadialGradient(x, y, 0, x, y, r);
     const dark = i % 2 === 0;
-    grd.addColorStop(0, dark ? 'rgba(150,150,150,0.22)' : 'rgba(255,255,255,0.18)');
+    grd.addColorStop(0, dark ? 'rgba(110,110,110,0.40)' : 'rgba(255,255,255,0.30)');
     grd.addColorStop(1, 'rgba(255,255,255,0)');
     g.fillStyle = grd;
     g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
   }
   // fine speckles
-  for (let i = 0; i < 4000; i++) {
-    const v = Math.random();
-    g.fillStyle = `rgba(${v > 0.5 ? '200,200,200' : '255,255,255'},0.5)`;
+  for (let i = 0; i < 5000; i++) {
+    const dark = Math.random() > 0.5;
+    g.fillStyle = dark ? 'rgba(120,120,120,0.30)' : 'rgba(255,255,255,0.30)';
     g.fillRect(Math.random() * 256, Math.random() * 256, 1, 1);
   }
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.repeat.set(4, 20); // integer Y → tiles seamlessly across the treadmill seam
+  return t;
+}
+
+// Soft radial alpha (white core → transparent edge). Used additively for the
+// sun halo and, tinted black, for the SUV contact shadow.
+function makeRadialTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const grd = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grd.addColorStop(0, 'rgba(255,255,255,1)');
+  grd.addColorStop(0.5, 'rgba(255,255,255,0.55)');
+  grd.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 128, 128);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
 
@@ -116,7 +143,7 @@ const KF = [
   { t: 0.00, dir: '#a0b4d0', int: 0.30, elev: -10, zen: '#050814', hor: '#0a0814', hemi: 0.15, sun: 0, stars: 1.0 },
   { t: 0.10, dir: '#ffd9a0', int: 0.55, elev: 4,   zen: '#244a6e', hor: 'sky:#ff9e5e:0.5', hemi: 0.30, sun: 1, stars: 0.4 },
   { t: 0.18, dir: '#ffe8c8', int: 1.10, elev: 18,  zen: '#1a3a5c', hor: 'sky', hemi: 0.45, sun: 1, stars: 0.0 },
-  { t: 0.30, dir: '#fff5e0', int: 1.40, elev: 38,  zen: '#1a3a5c', hor: 'sky', hemi: 0.50, sun: 1, stars: 0.0 },
+  { t: 0.30, dir: '#fff5e0', int: 1.60, elev: 38,  zen: '#1a3a5c', hor: 'sky', hemi: 0.50, sun: 1, stars: 0.0 },
   { t: 0.55, dir: '#fff0d0', int: 1.25, elev: 28,  zen: '#1c3c5e', hor: 'sky', hemi: 0.48, sun: 1, stars: 0.0 },
   { t: 0.66, dir: '#ff8c42', int: 0.90, elev: 10,  zen: '#2a3a6c', hor: 'sky:#ff8c42:0.6', hemi: 0.40, sun: 1, stars: 0.0 },
   { t: 0.75, dir: '#ff6a3a', int: 0.55, elev: 2,   zen: '#122244', hor: 'sky:#ff6a3a:0.5', hemi: 0.30, sun: 1, stars: 0.25 },
@@ -159,7 +186,7 @@ export class ParallaxScene {
     // ---- camera: behind & above the SUV, looking slightly down toward it ----
     this.camera = new THREE.PerspectiveCamera(60, this.width / this.height, 0.1, 600);
     this.camera.position.set(0, 9, -15);
-    this.camera.lookAt(0, 1, 14);
+    this.camera.lookAt(0, 2, 20);
 
     // ---- lights ----
     this.dirLight = new THREE.DirectionalLight(0xfff5e0, 1.4);
@@ -226,6 +253,15 @@ export class ParallaxScene {
     this.sun.renderOrder = -1;
     this.scene.add(this.sun);
 
+    // ---- sun halo (soft additive glow that tracks the sun) ----
+    this.sunHalo = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: makeRadialTexture(), color: 0xfff2c0,
+      blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, fog: false,
+    }));
+    this.sunHalo.scale.setScalar(40);
+    this.sunHalo.renderOrder = -1;
+    this.scene.add(this.sunHalo);
+
     // ---- stars ----
     this.stars = makeStars();
     this.stars.renderOrder = -1;
@@ -244,7 +280,8 @@ export class ParallaxScene {
     this.roadGeo = new THREE.PlaneGeometry(ROAD_W, TILE);
     this.roadGeo.rotateX(-Math.PI / 2);
     this.edgeGeo = new THREE.BoxGeometry(0.3, 0.04, TILE);
-    this.dashGeo = new THREE.BoxGeometry(0.15, 0.06, 7);
+    this.dashGeo = new THREE.BoxGeometry(0.18, 0.06, 7);
+    this.laneGeo = new THREE.BoxGeometry(0.08, 0.05, TILE); // solid yellow lane lines
     this.terrainGeoL = makeTerrainGeo(-TERRAIN_X);
     this.terrainGeoR = makeTerrainGeo(TERRAIN_X);
     this.coneGeo = new THREE.ConeGeometry(1, 1, 6);
@@ -294,6 +331,16 @@ export class ParallaxScene {
     });
     this.scene.add(this.suv.group);
 
+    // ---- contact shadow: a soft dark disc under the SUV so it reads planted ----
+    const contact = new THREE.Mesh(
+      new THREE.CircleGeometry(2.2, 32),
+      new THREE.MeshBasicMaterial({ map: makeRadialTexture(), color: 0x000000, transparent: true, opacity: 0.4, depthWrite: false }),
+    );
+    contact.rotation.x = -Math.PI / 2;
+    contact.position.set(0, 0.02, 0);
+    contact.renderOrder = 1;
+    this.scene.add(contact);
+
     this._lastScroll = gameState.miles * SCROLL;
 
     this._rebuildProps(); // initial props for the starting biome
@@ -315,14 +362,18 @@ export class ParallaxScene {
       tile.add(edge);
     }
 
-    // centerline: a crisp double-dashed line (center + flanking rows)
+    // centerline: a single crisp dashed line down the middle
     for (let i = 0; i < 20; i++) {
       const z = -TILE / 2 + i * (TILE / 20) + TILE / 40;
-      for (const dx of [-0.4, 0, 0.4]) {
-        const dash = new THREE.Mesh(this.dashGeo, this.dashMat);
-        dash.position.set(dx, 0.03, z);
-        tile.add(dash);
-      }
+      const dash = new THREE.Mesh(this.dashGeo, this.dashMat);
+      dash.position.set(0, 0.03, z);
+      tile.add(dash);
+    }
+    // solid yellow lane lines flanking the center
+    for (const sx of [-1.8, 1.8]) {
+      const lane = new THREE.Mesh(this.laneGeo, this.dashMat);
+      lane.position.set(sx, 0.03, 0);
+      tile.add(lane);
     }
 
     // terrain tiles (left + right of the road)
@@ -487,16 +538,19 @@ export class ParallaxScene {
     this.dome.position.copy(this.camera.position);
     this.stars.position.copy(this.camera.position);
 
-    // sun mesh: along the (unclamped) sun direction so it can sit near the horizon
+    // sun mesh + soft halo: along the (unclamped) sun direction so it can sit near the horizon
     this.sun.visible = dn.sun > 0.01;
     this.sun.position.set(this._azimuth.x * ce, se, this._azimuth.z * ce).multiplyScalar(350).add(this.camera.position);
+    this.sunHalo.visible = this.sun.visible;
+    this.sunHalo.position.copy(this.sun.position);
 
     // stars
     this.stars.material.opacity = dn.stars;
     this.stars.visible = dn.stars > 0.01;
 
-    // headlights / beams
+    // headlights / lamps / beams (lamps are inert glass by day, glow at night)
     for (const hl of this.suv.headlights) hl.intensity = dn.night ? 2.2 : 0;
+    for (const lamp of this.suv.lamps) lamp.material.emissiveIntensity = dn.night ? 1.4 : 0;
     for (const bm of this.suv.beams) bm.material.opacity = 0.3 * dn.stars;
 
     this.renderer.render(this.scene, this.camera);
@@ -517,7 +571,7 @@ export class ParallaxScene {
 
 // PlaneGeometry laid flat with sin/cos vertex displacement for rolling hills.
 function makeTerrainGeo(offsetX) {
-  const g = new THREE.PlaneGeometry(TERRAIN_W, TILE, 24, 80);
+  const g = new THREE.PlaneGeometry(TERRAIN_W, TILE, 40, 140);
   g.rotateX(-Math.PI / 2);
   const pos = g.attributes.position;
   for (let i = 0; i < pos.count; i++) {
