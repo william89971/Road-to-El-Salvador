@@ -28,8 +28,9 @@
   - Files: `eslint.config.js`, `src/game-engine/__tests__/gameRules.test.js`
   - Done when: `npm run lint` exits `0` with zero errors and zero warnings.
 
-- [ ] **A2 · Restore the trailing newline in `drivingScene3D.js`.**
+- [x] **A2 · Restore the trailing newline in `drivingScene3D.js`.** ✅ Fixed by hand.
   The PBR commit stripped the final newline (`\ No newline at end of file`).
+  *Lesson: invisible-whitespace / EOF tasks are a poor fit for an LLM loop (it must reproduce the whole region exactly for a one-byte change). These belong to a formatter (e.g. Prettier) or a human — don't feed them to the loop.*
   - Files: `src/game-engine/drivingScene3D.js`
   - Done when: `tail -c1 src/game-engine/drivingScene3D.js | od -An -c` shows `\n`; build still passes.
 

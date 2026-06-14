@@ -3,22 +3,24 @@
  * deepseek-loop.mjs — an autonomous loop with a maker/checker split.
  *
  * One iteration:
- *   1. Read TASKLIST.md, pick the first unchecked "Ready" task.
- *   2. MAKER  (cheap DeepSeek) writes the smallest change that satisfies it.
+ *   1. Read TASKLIST.md, pick the first unchecked "Ready" task (skipping any
+ *      already blocked this run).
+ *   2. MAKER  (cheap DeepSeek) writes the SMALLEST change as find/replace edits.
  *   3. GATE   (loop/gate.sh) runs build + tests + lint. Unfoolable. Must pass.
  *   4. CHECKER (a different, skeptical DeepSeek) tries to REFUTE that the diff
  *      truly + honestly completes the task and that the commit message does not
  *      overclaim. PASS only if it cannot refute.
- *   5. If gate AND checker pass: mark [x], commit honestly. Otherwise: revert
- *      and flag the task [!] for the human. Never checks off unverified work.
+ *   5. gate AND checker pass → mark [x], commit honestly. Otherwise → revert and
+ *      SKIP the task (flag for the human). Never checks off unverified work,
+ *      never retries the same task forever.
  *
  * Safety: off until DEEPSEEK_API_KEY is set. Refuses to run on main. Does ONE
- * task by default (--max-tasks). Stops on a cost cap, or if loop/STOP exists.
- * See loop/README.md for the friendly version.
+ * task by default (--max-tasks). Stops on a cost cap, an iteration cap, or if
+ * loop/STOP exists. See loop/README.md for the friendly version.
  * ──────────────────────────────────────────────────────────────────────────── */
 import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, statSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 
 // ── config ───────────────────────────────────────────────────────────────────
 const ROOT = process.cwd();
@@ -26,6 +28,7 @@ const TASKS_FILE = join(ROOT, 'TASKLIST.md');
 const LOG_FILE = join(ROOT, 'loop', 'loop-log.md');
 const STOP_FILE = join(ROOT, 'loop', 'STOP');
 const API_URL = 'https://api.deepseek.com/chat/completions';
+const HARD_ITERATION_CAP = 40; // backstop: never spin more than this many times
 
 // DeepSeek USD per 1M tokens (cache-miss input / cache-hit input / output).
 // Estimates, for the cost cap only — update if DeepSeek changes pricing.
@@ -68,21 +71,31 @@ Then run the loop again. To preview what it WOULD do without spending anything:
     process.exit(0);
   }
 
+  const blocked = new Set();   // task ids we attempted but could not finish — never re-selected
   let done = 0;
+  let iterations = 0;
   while (done < MAX_TASKS) {
+    if (++iterations > HARD_ITERATION_CAP) { say('Safety stop: hit the iteration cap.'); break; }
     if (existsSync(STOP_FILE)) { say('STOP file found — halting.'); break; }
     if (spentUSD >= MAX_COST)  { say(`Cost cap $${MAX_COST} reached — halting.`); break; }
 
-    const task = nextReadyTask();
-    if (!task) { say('No unchecked Ready tasks left. 🎉'); break; }
+    const task = nextReadyTask(blocked);
+    if (!task) {
+      say(blocked.size ? `\nNo completable Ready tasks left (${blocked.size} skipped — see notes above).` : '\nNo unchecked Ready tasks left. 🎉');
+      break;
+    }
 
     say(`\n━━━ Task ${task.id}: ${task.title} ━━━`);
     if (PLAN_ONLY) { planTask(task); break; }
 
     const outcome = await runTask(task);
     logResult(task, outcome);
-    if (outcome.status === 'done') done++;
-    else if (outcome.status === 'blocked') say(`Task ${task.id} left for you to look at. Moving on.`);
+    if (outcome.status === 'done') {
+      done++;
+    } else {
+      blocked.add(task.id);
+      say(`Task ${task.id} skipped (${outcome.reason}). Left for you to look at.`);
+    }
     say(`Spent so far: ~$${spentUSD.toFixed(4)}`);
   }
 
@@ -106,10 +119,11 @@ async function runTask(task) {
     say('• Maker (DeepSeek) is writing the change…');
     const maker = await callModel(MAKER_MODEL, makerMessages(task, priorError));
     const parsed = parseMaker(maker.content);
-    if (!parsed.files.length) { priorError = 'You returned no FILE blocks. Re-read the format.'; continue; }
+    if (!parsed.edits.length) { priorError = 'You produced no EDIT/NEW blocks in the required format. Re-read the format and try again.'; continue; }
 
-    // apply, remembering how to undo
-    const undo = applyFiles(parsed.files);
+    // apply edits (find/replace), remembering how to undo
+    const { undo, error } = applyEdits(parsed.edits);
+    if (error) { revert(undo); priorError = error; continue; }
 
     // 2) GATE
     say('• Gate is running build + tests + lint…');
@@ -123,13 +137,13 @@ async function runTask(task) {
     say('  Gate PASSED ✅');
 
     // 3) CHECKER (adversarial, different model)
-    const diff = git('diff', '--', ...parsed.files.map(f => f.path));
+    const paths = parsed.edits.map(e => e.path);
+    const diff = git('diff', '--', ...paths);
     say(`• Checker (${CHECKER_MODEL}) is trying to refute it…`);
     const checkRaw = await callModel(CHECKER_MODEL, checkerMessages(task, diff, parsed.commit));
     const verdict = parseVerdict(checkRaw.content);
     if (verdict.pass !== true) {
       say(`  Checker REFUTED: ${verdict.reasons}`);
-      say('  Reverting and flagging for you.');
       revert(undo);
       return { status: 'blocked', reason: `checker refused: ${verdict.reasons}` };
     }
@@ -138,18 +152,18 @@ async function runTask(task) {
     // 4) commit honestly + check the box
     markTaskDone(task);
     const msg = `${parsed.commit}\n\nTask ${task.id}. Verified by gate (build+test+lint) and adversarial checker (${CHECKER_MODEL}).\n\nCo-Authored-By: DeepSeek loop <noreply@deepseek.local>`;
-    git('add', '--', ...parsed.files.map(f => f.path), 'TASKLIST.md');
+    git('add', '--', ...paths, 'TASKLIST.md');
     git('commit', '-q', '-F', '-', { input: msg });
     say(`✓ Committed ${task.id}.`);
-    return { status: 'done', commit: parsed.commit, files: parsed.files.map(f => f.path) };
+    return { status: 'done', commit: parsed.commit, files: paths };
   }
 
-  return { status: 'blocked', reason: `gave up after ${MAX_RETRIES} retries; last error fed back to maker` };
+  return { status: 'blocked', reason: `gave up after ${MAX_RETRIES} retries` };
 }
 
 // ── DeepSeek call + cost tracking ────────────────────────────────────────────
 async function callModel(model, messages) {
-  const body = { model, messages, temperature: float(args.temperature, 0.3), stream: false };
+  const body = { model, messages, temperature: float(args.temperature, 0.2), stream: false };
   for (let tryN = 0; tryN < 3; tryN++) {
     try {
       const res = await fetch(API_URL, {
@@ -186,7 +200,7 @@ function makerMessages(task, priorError) {
     const abs = join(ROOT, f);
     return existsSync(abs)
       ? `--- ${f} ---\n${readFileSync(abs, 'utf8')}`
-      : `--- ${f} (does not exist yet; create it) ---`;
+      : `--- ${f} (does not exist yet) ---`;
   }).join('\n\n');
   const tree = git('ls-files', 'src', 'server', 'index.html', 'eslint.config.js').trim();
 
@@ -195,14 +209,24 @@ Rules:
 - Make the SMALLEST change that satisfies the task's "Done when" check. Touch nothing unrelated.
 - Only edit/create the files the task lists.
 - Honesty over ambition: your commit message must describe ONLY what your diff actually does. Claiming more than the diff shows is the worst possible outcome.
-- Output format, exactly:
-===COMMIT: <imperative one-line summary of what the diff really does>===
-===FILE: <relative/path>===
-<the FULL new contents of that file>
-===END===
-(repeat FILE/END for each changed or created file; output nothing else)`;
 
-  const usr = `PROJECT RULES:\n${rules}\n\nDEFINITION OF DONE:\n${dod}\n\nREPO FILES:\n${tree}\n\nTASK ${task.id}: ${task.title}\n${task.body}\n\nFILES IN SCOPE:\n${fileBlobs}` +
+Output ONLY these blocks, nothing else. Use EDIT to change an existing file (strongly preferred). Use NEW only to create a file that does not exist.
+
+===COMMIT: <imperative one-line summary of what the diff really does>===
+===EDIT: <relative/path>===
+<<<<<<< SEARCH
+<a few lines copied BYTE-FOR-BYTE from the current file — include enough surrounding lines to be unique, with exact indentation>
+=======
+<the replacement lines>
+>>>>>>> REPLACE
+===END===
+===NEW: <relative/path>===
+<the full contents of the new file>
+===END===
+
+You may include multiple EDIT/NEW blocks. The SEARCH text must match the file exactly or the edit is rejected.`;
+
+  const usr = `PROJECT RULES:\n${rules}\n\nDEFINITION OF DONE:\n${dod}\n\nREPO FILES:\n${tree}\n\nTASK ${task.id}: ${task.title}\n${task.body}\n\nCURRENT CONTENTS OF FILES IN SCOPE:\n${fileBlobs}` +
     (priorError ? `\n\nYOUR PREVIOUS ATTEMPT FAILED. Fix it. Details:\n${priorError}` : '');
 
   return [{ role: 'system', content: sys }, { role: 'user', content: usr }];
@@ -223,11 +247,17 @@ PASS only if you genuinely cannot refute it.`;
 // ── parsing ──────────────────────────────────────────────────────────────────
 function parseMaker(text) {
   const commit = (text.match(/===COMMIT:\s*([\s\S]*?)===/) || [])[1]?.trim() || 'Apply task change';
-  const files = [];
-  const re = /===FILE:\s*(.+?)===\r?\n([\s\S]*?)\r?\n===END===/g;
+  const edits = [];
+  const editRe = /===EDIT:\s*(.+?)===\r?\n<<<<<<< SEARCH\r?\n([\s\S]*?)\r?\n=======\r?\n([\s\S]*?)\r?\n>>>>>>> REPLACE\r?\n===END===/g;
   let m;
-  while ((m = re.exec(text))) files.push({ path: m[1].trim(), content: m[2] });
-  return { commit, files };
+  while ((m = editRe.exec(text))) edits.push({ type: 'edit', path: m[1].trim(), search: m[2], replace: m[3] });
+  const newRe = /===NEW:\s*(.+?)===\r?\n([\s\S]*?)\r?\n===END===/g;
+  while ((m = newRe.exec(text))) {
+    const path = m[1].trim();
+    if (edits.some(e => e.path === path)) continue; // already handled as an EDIT
+    edits.push({ type: 'new', path, content: m[2] });
+  }
+  return { commit, edits };
 }
 
 function parseVerdict(text) {
@@ -235,29 +265,28 @@ function parseVerdict(text) {
     const j = JSON.parse((text.match(/\{[\s\S]*\}/) || ['{}'])[0]);
     return { pass: String(j.verdict).toUpperCase() === 'PASS', reasons: j.reasons || '' };
   } catch {
-    // if the checker didn't return clean JSON, fail closed
     return { pass: /\bPASS\b/.test(text) && !/\bREFUTE\b/.test(text), reasons: text.slice(0, 200) };
   }
 }
 
 // ── TASKLIST parsing ─────────────────────────────────────────────────────────
-function nextReadyTask() {
+function nextReadyTask(skip = new Set()) {
   const md = readFileSync(TASKS_FILE, 'utf8');
   const ready = section(md, 'Ready');
-  // split into top-level checkbox items
   const items = ready.split(/\n(?=- \[[ x!]\] )/).filter(s => /^- \[[ x!]\]/.test(s.trim()));
   for (const block of items) {
     if (!/^- \[ \]/.test(block.trim())) continue;          // only unchecked
     const id = (block.match(/\*\*(A\d+)/) || [])[1] || '?';
+    if (skip.has(id)) continue;                            // already blocked this run
     const head = (block.match(/\*\*(.+?)\*\*/) || [])[1] || id;
     const title = head.replace(/^A\d+\s*[·.\-:]?\s*/, '').trim();
-    // Only treat a backtick token as an in-scope file if it's a real path
-    // (contains a slash) or actually exists at the repo root (e.g. index.html).
+    // a backtick token counts as an in-scope file only if it's a real file in
+    // the repo (this rejects import specifiers like `./gameState.js` and bare
+    // filenames mentioned in prose). New files are created via the task body.
     const files = [...block.matchAll(/`([^`]+\.(?:js|jsx|mjs|ts|html|json|sh|md))`/g)]
       .map(m => m[1])
-      .filter(p => p.includes('/') || existsSync(join(ROOT, p)));
-    const uniqFiles = [...new Set(files)];
-    return { id, title, body: block.trim(), files: uniqFiles };
+      .filter(p => existsSync(join(ROOT, p)));
+    return { id, title, body: block.trim(), files: [...new Set(files)] };
   }
   return null;
 }
@@ -268,18 +297,28 @@ function markTaskDone(task) {
   writeFileSync(TASKS_FILE, out);
 }
 
-// ── file apply / revert ──────────────────────────────────────────────────────
-function applyFiles(files) {
+// ── edit apply / revert ──────────────────────────────────────────────────────
+function applyEdits(edits) {
   const undo = [];
-  for (const f of files) {
-    const abs = join(ROOT, f.path);
-    const existed = existsSync(abs);
-    mkdirSync(join(abs, '..'), { recursive: true });
-    writeFileSync(abs, f.content);
-    undo.push({ path: f.path, abs, existed });
-    say(`  wrote ${f.path} (${existed ? 'modified' : 'new'})`);
+  for (const e of edits) {
+    const abs = join(ROOT, e.path);
+    if (e.type === 'new') {
+      if (existsSync(abs)) return { undo, error: `NEW ${e.path}: that file already exists — use an EDIT block instead.` };
+      mkdirSync(dirname(abs), { recursive: true });
+      writeFileSync(abs, e.content);
+      undo.push({ abs, path: e.path, existed: false });
+      say(`  created ${e.path}`);
+    } else {
+      if (!existsSync(abs)) return { undo, error: `EDIT ${e.path}: file not found.` };
+      const cur = readFileSync(abs, 'utf8');
+      const idx = cur.indexOf(e.search);
+      if (idx === -1) return { undo, error: `EDIT ${e.path}: the SEARCH text was not found. Copy it byte-for-byte from the current file (exact indentation).` };
+      writeFileSync(abs, cur.slice(0, idx) + e.replace + cur.slice(idx + e.search.length));
+      undo.push({ abs, path: e.path, existed: true });
+      say(`  edited ${e.path}`);
+    }
   }
-  return undo;
+  return { undo, error: null };
 }
 
 function revert(undo) {
