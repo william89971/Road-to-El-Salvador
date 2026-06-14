@@ -89,7 +89,7 @@
   - Files: new test under `src/game-engine/__tests__/`
   - Done when: tests assert a large positive `vibes` effect caps at 5 and a large negative `cash` effect floors at 0; `npm test` passes.
 
-- [ ] **B4 · Unit-test `GET /api/runs` sorting and limit.**
+- [!] **B4 · Unit-test `GET /api/runs` sorting and limit.**
   `GET /api/runs` returns runs sorted by `btcValue` descending, limited by the `n` query param.
   - Files: new test under `server/__tests__/`
   - Done when: a test (using its own temp `RUNS_FILE` and `app.listen(0)`, like `server/__tests__/api.test.js`) seeds 3 runs, requests `GET /api/runs?n=2`, and asserts 2 results in descending `btcValue` order; `npm test` passes.
