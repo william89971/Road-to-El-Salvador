@@ -23,6 +23,10 @@ afterAll(() => {
   try { rmSync(RUNS, { force: true }); } catch { /* ignore */ }
 });
 
+function get(path) {
+  return globalThis.fetch(`${base}${path}`);
+}
+
 function post(body) {
   return globalThis.fetch(`${base}/api/runs`, {
     method: 'POST',
@@ -30,6 +34,15 @@ function post(body) {
     body: JSON.stringify(body),
   });
 }
+
+describe('GET /api/health', () => {
+  it('responds 200 with { ok: true }', async () => {
+    const res = await get('/api/health');
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({ ok: true });
+  });
+});
 
 describe('POST /api/runs validation', () => {
   it('rejects a non-numeric btcValue with 400', async () => {

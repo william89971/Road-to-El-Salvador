@@ -94,7 +94,7 @@
   - Files: new test under `server/__tests__/`
   - Done when: a test (using its own temp `RUNS_FILE` and `app.listen(0)`, like `server/__tests__/api.test.js`) seeds 3 runs, requests `GET /api/runs?n=2`, and asserts 2 results in descending `btcValue` order; `npm test` passes.
 
-- [ ] **B5 · Add a `GET /api/health` endpoint.**
+- [x] **B5 · Add a `GET /api/health` endpoint.**
   A standard health check for uptime monitoring.
   - Files: `server/index.js`, a server test
   - Done when: `GET /api/health` responds 200 with JSON `{ "ok": true }`, and a test asserts it; `npm test` passes.

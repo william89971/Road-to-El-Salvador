@@ -31,6 +31,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// GET /api/health — standard health check for uptime monitoring
+app.get('/api/health', (_req, res) => {
+  res.json({ ok: true });
+});
+
 // GET /api/runs — return top N runs sorted by btcValue desc
 app.get('/api/runs', (_req, res) => {
   const runs = loadRuns();
