@@ -79,7 +79,7 @@
   - Files: new test under `src/game-engine/__tests__/`
   - Done when: a test imports `endGame` and `gameState`, calls `endGame('out of gas')`, and asserts `screen === 'gameover'` and `gameoverReason === 'out of gas'`; `npm test` passes with more tests than before.
 
-- [ ] **B2 · Unit-test `tick` gas/health loss conditions.**
+- [!] **B2 · Unit-test `tick` gas/health loss conditions.**
   In `gameRules.js`, when `gas` hits 0 or `suvHealth` hits 0 during a tick, the game must end (`screen` becomes `'gameover'`). Only the `vibes` case is currently covered.
   - Files: new test under `src/game-engine/__tests__/`
   - Done when: tests put the game in a playing state (`screen:'playing'`, `paused:false`), drive `gas` to 0 (and, separately, `suvHealth` to 0) via `tick`, and assert the game ends; `npm test` passes.
