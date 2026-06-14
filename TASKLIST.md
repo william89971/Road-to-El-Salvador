@@ -74,7 +74,7 @@
   - Files: `.codewhale/instructions.md`
   - Done when: the file states "commit messages must not claim more than the diff does" and "only check off a task when its Done-when check passes"; `grep -q 'Done-when' .codewhale/instructions.md` succeeds.
 
-- [ ] **B1 · Unit-test `endGame()`.**
+- [x] **B1 · Unit-test `endGame()`.**
   `endGame(reason)` in `gameState.js` should set `gameState.screen` to `'gameover'` and `gameState.gameoverReason` to the passed-in reason.
   - Files: new test under `src/game-engine/__tests__/`
   - Done when: a test imports `endGame` and `gameState`, calls `endGame('out of gas')`, and asserts `screen === 'gameover'` and `gameoverReason === 'out of gas'`; `npm test` passes with more tests than before.
