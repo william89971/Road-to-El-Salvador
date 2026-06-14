@@ -7,8 +7,8 @@ export default [
   { ignores: ['dist'] },
   js.configs.recommended,
   {
-    // Server code runs in Node, not the browser — give it Node globals (process, etc.)
-    files: ['server/**/*.js'],
+    // Server + loop tooling run in Node, not the browser — give them Node globals (process, etc.)
+    files: ['server/**/*.js', 'loop/**/*.{js,mjs}'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
