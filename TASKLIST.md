@@ -1,7 +1,7 @@
 # 🚀 Road to El Salvador - Advanced Production Backlog
 
 ## Phase 1: Hyper-Realistic Graphics & Rendering
-- [ ] **Implement Physically Based Rendering (PBR):** Upgrade all standard materials to PBR materials. Ensure all 3D assets have albedo, normal, roughness, and metalness maps for realistic light interaction.
+- [x] **Implement Physically Based Rendering (PBR):** Upgrade all standard materials to PBR materials. Ensure all 3D assets have albedo, normal, roughness, and metalness maps for realistic light interaction.
 - [ ] **Post-Processing Pipeline:** Integrate an effect composer with Screen Space Ambient Occlusion (SSAO) for deep shadows in corners, Bloom for glowing elements (like holographic UI or neon lights), and Depth of Field for cinematic focus.
 - [ ] **Advanced Lighting & Shadows:** Replace basic lighting with High Dynamic Range (HDRI) environment maps for realistic sky/ambient lighting. Enable soft shadow mapping and directional light cascades to prevent shadow pixelation.
 - [ ] **Dynamic Particle Systems:** Build a custom GPU-instanced particle system for environmental effects (smoke from ruins, sparks, rain, dust motes) that react to in-game wind or explosions.
