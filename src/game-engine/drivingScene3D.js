@@ -722,14 +722,35 @@ export class ParallaxScene {
   }
 
   dispose() {
+    const disposedTex = new Set();
+    const disposedMat = new Set();
+    const disposedGeo = new Set();
+
+    const disposeTexture = (tex) => {
+      if (!tex || disposedTex.has(tex)) return;
+      disposedTex.add(tex);
+      tex.dispose();
+    };
+
     this.scene.traverse((obj) => {
-      if (obj.geometry) obj.geometry.dispose();
+      if (obj.geometry && !disposedGeo.has(obj.geometry)) {
+        disposedGeo.add(obj.geometry);
+        obj.geometry.dispose();
+      }
       if (obj.material) {
         const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-        for (const mm of mats) { if (mm.map) mm.map.dispose(); mm.dispose(); }
+        for (const mm of mats) {
+          if (disposedMat.has(mm)) continue;
+          disposedMat.add(mm);
+          // dispose all texture slots, not just .map
+          for (const key of ['map', 'lightMap', 'aoMap', 'emissiveMap', 'bumpMap', 'normalMap', 'displacementMap', 'roughnessMap', 'metalnessMap', 'alphaMap', 'envMap']) {
+            disposeTexture(mm[key]);
+          }
+          mm.dispose();
+        }
       }
     });
-    this.dirLight.shadow.map?.dispose();
+    disposeTexture(this.dirLight.shadow.map);
     this.renderer.dispose();
   }
 }
