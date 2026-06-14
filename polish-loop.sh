@@ -7,8 +7,8 @@ LOG_FILE="polish-log.txt"
 MAX_RUNS=10
 RUN_COUNT=0
 
-# Ensure we start fresh
-git checkout -b automated-polishing
+# Ensure we start fresh (create or reset the branch)
+git checkout -B automated-polishing main
 
 while [ $RUN_COUNT -lt $MAX_RUNS ]; do
   echo "=== Loop run $((RUN_COUNT+1)) at $(date) ===" | tee -a $LOG_FILE
