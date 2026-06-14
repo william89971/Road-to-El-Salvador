@@ -10,8 +10,6 @@ export default function LeaderboardScreen({ onClose }) {
     return () => { alive = false; };
   }, []);
 
-  const hasStorage = typeof window !== 'undefined' && !!window.storage;
-
   return (
     <div style={st.wrap} onClick={onClose}>
       <div style={st.panel} onClick={(e) => e.stopPropagation()}>
@@ -25,9 +23,6 @@ export default function LeaderboardScreen({ onClose }) {
         ) : runs.length === 0 ? (
           <div style={st.empty}>
             No runs recorded yet.
-            {!hasStorage && (
-              <div style={st.note}>The shared leaderboard is available when the game runs as a Claude artifact.</div>
-            )}
           </div>
         ) : (
           <ol style={st.list}>
