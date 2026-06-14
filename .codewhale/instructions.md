@@ -6,3 +6,5 @@
 - When fixing UI issues, use the browser's developer tools mindset to verify CSS changes.
 - For any change that affects game balance (e.g., inflation rate), note the old and new values in the commit message.
 - Before marking a leaderboard task as complete, ensure it works without the Claude artifact environment.
+- Commit messages must not claim more than the diff does.
+- Only check off a task when its Done-when check passes.

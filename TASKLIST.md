@@ -69,7 +69,7 @@
   - Files: `server/index.js`, new server test
   - Done when: a test asserts `POST {btcValue:"abc"}` → 400 and a valid payload → 201; `npm test` passes.
 
-- [ ] **A10 · Encode the anti-slop rule into the agent's project instructions.**
+- [x] **A10 · Encode the anti-slop rule into the agent's project instructions.**
   So the maker reads the contract every run, not just this file.
   - Files: `.codewhale/instructions.md`
   - Done when: the file states "commit messages must not claim more than the diff does" and "only check off a task when its Done-when check passes"; `grep -q 'Done-when' .codewhale/instructions.md` succeeds.
