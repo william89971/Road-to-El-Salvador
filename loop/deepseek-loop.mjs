@@ -93,8 +93,9 @@ Then run the loop again. To preview what it WOULD do without spending anything:
     if (outcome.status === 'done') {
       done++;
     } else {
+      markTaskBlocked(task, outcome.reason);   // record [!] so future runs skip it
       blocked.add(task.id);
-      say(`Task ${task.id} skipped (${outcome.reason}). Left for you to look at.`);
+      say(`Task ${task.id} marked [!] blocked (${outcome.reason}). Left for you to look at.`);
     }
     say(`Spent so far: ~$${spentUSD.toFixed(4)}`);
   }
@@ -138,9 +139,11 @@ async function runTask(task) {
 
     // 3) CHECKER (adversarial, different model)
     const paths = parsed.edits.map(e => e.path);
+    // fall back to a task-derived message if the maker omitted ===COMMIT:===
+    const commitMsg = parsed.commit || `Complete ${task.id}: ${task.title}`;
     const diff = git('diff', '--', ...paths);
     say(`• Checker (${CHECKER_MODEL}) is trying to refute it…`);
-    const checkRaw = await callModel(CHECKER_MODEL, checkerMessages(task, diff, parsed.commit));
+    const checkRaw = await callModel(CHECKER_MODEL, checkerMessages(task, diff, commitMsg));
     const verdict = parseVerdict(checkRaw.content);
     if (verdict.pass !== true) {
       say(`  Checker REFUTED: ${verdict.reasons}`);
@@ -151,7 +154,7 @@ async function runTask(task) {
 
     // 4) commit honestly + check the box
     markTaskDone(task);
-    const msg = `${parsed.commit}\n\nTask ${task.id}. Verified by gate (build+test+lint) and adversarial checker (${CHECKER_MODEL}).\n\nCo-Authored-By: DeepSeek loop <noreply@deepseek.local>`;
+    const msg = `${commitMsg}\n\nTask ${task.id}. Verified by gate (build+test+lint) and adversarial checker (${CHECKER_MODEL}).\n\nCo-Authored-By: DeepSeek loop <noreply@deepseek.local>`;
     git('add', '--', ...paths, 'TASKLIST.md');
     git('commit', '-q', '-F', '-', { input: msg });
     say(`✓ Committed ${task.id}.`);
@@ -246,7 +249,7 @@ PASS only if you genuinely cannot refute it.`;
 
 // ── parsing ──────────────────────────────────────────────────────────────────
 function parseMaker(text) {
-  const commit = (text.match(/===COMMIT:\s*([\s\S]*?)===/) || [])[1]?.trim() || 'Apply task change';
+  const commit = (text.match(/===COMMIT:\s*([\s\S]*?)===/) || [])[1]?.trim() || '';
   const edits = [];
   const editRe = /===EDIT:\s*(.+?)===\r?\n<<<<<<< SEARCH\r?\n([\s\S]*?)\r?\n=======\r?\n([\s\S]*?)\r?\n>>>>>>> REPLACE\r?\n===END===/g;
   let m;
@@ -295,6 +298,17 @@ function markTaskDone(task) {
   const md = readFileSync(TASKS_FILE, 'utf8');
   const out = md.replace(new RegExp(`- \\[ \\] (\\*\\*${task.id}\\b)`), `- [x] $1`);
   writeFileSync(TASKS_FILE, out);
+}
+
+// On block, flip [ ] → [!] and commit just that marker, so future runs skip the
+// task (nextReadyTask only picks [ ]) instead of re-attempting and re-spending.
+function markTaskBlocked(task, reason) {
+  const md = readFileSync(TASKS_FILE, 'utf8');
+  const out = md.replace(new RegExp(`- \\[ \\] (\\*\\*${task.id}\\b)`), `- [!] $1`);
+  if (out === md) return;               // couldn't find it / already marked — skip
+  writeFileSync(TASKS_FILE, out);
+  git('add', '--', 'TASKLIST.md');
+  git('commit', '-q', '-F', '-', { input: `Mark ${task.id} blocked — loop could not complete\n\n${(reason || '').slice(0, 200)}\n\nCo-Authored-By: DeepSeek loop <noreply@deepseek.local>` });
 }
 
 // ── edit apply / revert ──────────────────────────────────────────────────────
