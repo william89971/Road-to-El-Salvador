@@ -59,7 +59,7 @@
   - Files: new test under `src/game-engine/__tests__/`
   - Done when: a test fills `recentEventTitles` with all-but-one headline and asserts the remaining one is returned; `npm test` passes.
 
-- [ ] **A8 · Make the Express server testable: export `app`, listen only when run directly.**
+- [x] **A8 · Make the Express server testable: export `app`, listen only when run directly.**
   `server/index.js` calls `app.listen` on import, so it can't be unit-tested. Guard the listen behind the run-as-main check and `export { app }`.
   - Files: `server/index.js`
   - Done when: importing the module does not bind a port; `export { app }` exists; `npm run lint` and `npm test` still pass.

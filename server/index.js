@@ -55,6 +55,10 @@ app.post('/api/runs', (req, res) => {
   res.status(201).json({ ok: true });
 });
 
-app.listen(PORT, () => {
-  console.log(`🛻₿ Leaderboard server listening on http://localhost:${PORT}`);
-});
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  app.listen(PORT, () => {
+    console.log(`🛻₿ Leaderboard server listening on http://localhost:${PORT}`);
+  });
+}
+
+export { app };
