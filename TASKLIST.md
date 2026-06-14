@@ -84,7 +84,7 @@
   - Files: new test under `src/game-engine/__tests__/`
   - Done when: tests put the game in a playing state (`screen:'playing'`, `paused:false`), drive `gas` to 0 (and, separately, `suvHealth` to 0) via `tick`, and assert the game ends; `npm test` passes.
 
-- [ ] **B3 · Unit-test `applyEffects` clamping bounds.**
+- [x] **B3 · Unit-test `applyEffects` clamping bounds.**
   `applyEffects` in `gameRules.js` clamps each resource: `vibes` 0–5, `purchasingPower` 1–100, `cash` 0–99999, `btc` 0–99, `gas`/`suvHealth` 0–100.
   - Files: new test under `src/game-engine/__tests__/`
   - Done when: tests assert a large positive `vibes` effect caps at 5 and a large negative `cash` effect floors at 0; `npm test` passes.
