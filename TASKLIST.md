@@ -34,7 +34,7 @@
   - Files: `src/game-engine/drivingScene3D.js`
   - Done when: `tail -c1 src/game-engine/drivingScene3D.js | od -An -c` shows `\n`; build still passes.
 
-- [ ] **A3 · Remove the mixed static/dynamic import of `gameStateAndRules.js`.**
+- [x] **A3 · Remove the mixed static/dynamic import of `gameStateAndRules.js`.**
   `leaderboardStorage.js` does `await import('./gameStateAndRules.js')` while every other file imports it statically, which triggers a Vite warning and prevents clean chunking. Import `gameState` statically from `./gameState.js` instead.
   - Files: `src/game-engine/leaderboardStorage.js`
   - Done when: `npm run build` output contains no `dynamically imported ... but also statically imported` warning.

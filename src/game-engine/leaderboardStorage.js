@@ -1,3 +1,5 @@
+import { gameState } from './gameState.js';
+
 // Leaderboard storage — tries the backend API first, falls back to localStorage.
 const API_BASE = '/api';
 const STORAGE_PREFIX = 'btc_run:';
@@ -11,7 +13,6 @@ async function tryApi(path, opts) {
 }
 
 export async function saveRun() {
-  const { gameState } = await import('./gameStateAndRules.js');
   const run = {
     name: gameState.playerName || 'Anon',
     btc: gameState.btc,
