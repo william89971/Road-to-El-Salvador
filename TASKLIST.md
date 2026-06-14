@@ -44,17 +44,17 @@
   - Files: `index.html`
   - Done when: `grep -c 'user-scalable=no\|maximum-scale' index.html` returns `0`; build passes.
 
-- [ ] **A5 · Unit-test `resetGame` difficulty multipliers.**
+- [x] **A5 · Unit-test `resetGame` difficulty multipliers.** ✅ Done by hand.
   Starting cash should scale: tourist ×1.5, road_warrior ×1, satoshi ×0.5.
   - Files: new test under `src/game-engine/__tests__/`
   - Done when: a test asserts all three multipliers off the loadout's base cash; `npm test` passes with a higher test count than before.
 
-- [ ] **A6 · Unit-test the leaderboard localStorage fallback.**
+- [x] **A6 · Unit-test the leaderboard localStorage fallback.** ✅ Done by hand.
   `topRuns(n)` should return entries sorted by `btcValue` descending and respect the `n` limit when the backend is unreachable.
   - Files: new test under `src/game-engine/__tests__/` (stub `localStorage` and `fetch`)
   - Done when: a test seeds 3 fake runs, asserts descending order and that `topRuns(2)` returns 2; `npm test` passes.
 
-- [ ] **A7 · Unit-test event de-duplication in DEV_MODE.**
+- [x] **A7 · Unit-test event de-duplication in DEV_MODE.** ✅ Done by hand.
   `getEvent()` must not return a headline already in `gameState.recentEventTitles` when an unused alternative exists.
   - Files: new test under `src/game-engine/__tests__/`
   - Done when: a test fills `recentEventTitles` with all-but-one headline and asserts the remaining one is returned; `npm test` passes.
@@ -64,7 +64,7 @@
   - Files: `server/index.js`
   - Done when: importing the module does not bind a port; `export { app }` exists; `npm run lint` and `npm test` still pass.
 
-- [ ] **A9 · Validate `btcValue` in `POST /api/runs` (depends on A8).**
+- [x] **A9 · Validate `btcValue` in `POST /api/runs` (depends on A8).** ✅ Done by hand.
   Currently `Number("abc")` → `NaN` is written to `runs.json`. Reject non-finite or negative `btcValue` with HTTP 400.
   - Files: `server/index.js`, new server test
   - Done when: a test asserts `POST {btcValue:"abc"}` → 400 and a valid payload → 201; `npm test` passes.

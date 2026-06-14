@@ -9,12 +9,14 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DATA_FILE = join(__dirname, 'runs.json');
+// Data-file path, overridable via RUNS_FILE so tests can write to a temp file.
+const dataFile = () => process.env.RUNS_FILE || join(__dirname, 'runs.json');
 const PORT = process.env.PORT || 3001;
 
 function loadRuns() {
+  const f = dataFile();
   try {
-    if (existsSync(DATA_FILE)) return JSON.parse(readFileSync(DATA_FILE, 'utf-8'));
+    if (existsSync(f)) return JSON.parse(readFileSync(f, 'utf-8'));
   } catch { /* corrupt file — start fresh */ }
   return [];
 }
@@ -22,7 +24,7 @@ function loadRuns() {
 function saveRuns(runs) {
   // keep at most 500 entries to prevent unbounded growth
   const trimmed = runs.slice(0, 500);
-  writeFileSync(DATA_FILE, JSON.stringify(trimmed, null, 2), 'utf-8');
+  writeFileSync(dataFile(), JSON.stringify(trimmed, null, 2), 'utf-8');
 }
 
 const app = express();
@@ -40,13 +42,16 @@ app.get('/api/runs', (_req, res) => {
 // POST /api/runs — save a completed run
 app.post('/api/runs', (req, res) => {
   const { name, btc, btcValue, pp, days } = req.body || {};
-  if (btcValue == null) return res.status(400).json({ error: 'btcValue is required' });
+  const value = Number(btcValue);
+  if (btcValue == null || !Number.isFinite(value) || value < 0) {
+    return res.status(400).json({ error: 'btcValue must be a non-negative number' });
+  }
 
   const runs = loadRuns();
   runs.push({
     name: (name || 'Anon').slice(0, 32),
     btc: Number(btc) || 0,
-    btcValue: Math.round(Number(btcValue)),
+    btcValue: Math.round(value),
     pp: Math.round(Number(pp) || 0),
     days: Math.round(Number(days) || 0),
     ts: Date.now(),
