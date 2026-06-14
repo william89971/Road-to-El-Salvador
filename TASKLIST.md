@@ -74,6 +74,36 @@
   - Files: `.codewhale/instructions.md`
   - Done when: the file states "commit messages must not claim more than the diff does" and "only check off a task when its Done-when check passes"; `grep -q 'Done-when' .codewhale/instructions.md` succeeds.
 
+- [ ] **B1 · Unit-test `endGame()`.**
+  `endGame(reason)` in `gameState.js` should set `gameState.screen` to `'gameover'` and `gameState.gameoverReason` to the passed-in reason.
+  - Files: new test under `src/game-engine/__tests__/`
+  - Done when: a test imports `endGame` and `gameState`, calls `endGame('out of gas')`, and asserts `screen === 'gameover'` and `gameoverReason === 'out of gas'`; `npm test` passes with more tests than before.
+
+- [ ] **B2 · Unit-test `tick` gas/health loss conditions.**
+  In `gameRules.js`, when `gas` hits 0 or `suvHealth` hits 0 during a tick, the game must end (`screen` becomes `'gameover'`). Only the `vibes` case is currently covered.
+  - Files: new test under `src/game-engine/__tests__/`
+  - Done when: tests put the game in a playing state (`screen:'playing'`, `paused:false`), drive `gas` to 0 (and, separately, `suvHealth` to 0) via `tick`, and assert the game ends; `npm test` passes.
+
+- [ ] **B3 · Unit-test `applyEffects` clamping bounds.**
+  `applyEffects` in `gameRules.js` clamps each resource: `vibes` 0–5, `purchasingPower` 1–100, `cash` 0–99999, `btc` 0–99, `gas`/`suvHealth` 0–100.
+  - Files: new test under `src/game-engine/__tests__/`
+  - Done when: tests assert a large positive `vibes` effect caps at 5 and a large negative `cash` effect floors at 0; `npm test` passes.
+
+- [ ] **B4 · Unit-test `GET /api/runs` sorting and limit.**
+  `GET /api/runs` returns runs sorted by `btcValue` descending, limited by the `n` query param.
+  - Files: new test under `server/__tests__/`
+  - Done when: a test (using its own temp `RUNS_FILE` and `app.listen(0)`, like `server/__tests__/api.test.js`) seeds 3 runs, requests `GET /api/runs?n=2`, and asserts 2 results in descending `btcValue` order; `npm test` passes.
+
+- [ ] **B5 · Add a `GET /api/health` endpoint.**
+  A standard health check for uptime monitoring.
+  - Files: `server/index.js`, a server test
+  - Done when: `GET /api/health` responds 200 with JSON `{ "ok": true }`, and a test asserts it; `npm test` passes.
+
+- [ ] **B6 · Ignore the server's runtime data file.**
+  `server/runs.json` is written at runtime and should never be committed.
+  - Files: `.gitignore`
+  - Done when: `grep -q 'server/runs.json' .gitignore` succeeds; `npm run build` still passes.
+
 ---
 
 ## Parking lot — NOT loop-ready (reclassified from the old backlog)

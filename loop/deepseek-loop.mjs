@@ -297,10 +297,10 @@ function nextReadyTask(skip = new Set()) {
   const items = ready.split(/\n(?=- \[[ x!]\] )/).filter(s => /^- \[[ x!]\]/.test(s.trim()));
   for (const block of items) {
     if (!/^- \[ \]/.test(block.trim())) continue;          // only unchecked
-    const id = (block.match(/\*\*(A\d+)/) || [])[1] || '?';
+    const id = (block.match(/\*\*([A-Za-z]+\d+)/) || [])[1] || '?';
     if (skip.has(id)) continue;                            // already blocked this run
     const head = (block.match(/\*\*(.+?)\*\*/) || [])[1] || id;
-    const title = head.replace(/^A\d+\s*[·.\-:]?\s*/, '').trim();
+    const title = head.replace(/^[A-Za-z]+\d+\s*[·.\-:]?\s*/, '').trim();
     // a backtick token counts as an in-scope file only if it's a real file in
     // the repo (this rejects import specifiers like `./gameState.js` and bare
     // filenames mentioned in prose). New files are created via the task body.
