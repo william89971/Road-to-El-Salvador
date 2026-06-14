@@ -99,7 +99,7 @@
   - Files: `server/index.js`, a server test
   - Done when: `GET /api/health` responds 200 with JSON `{ "ok": true }`, and a test asserts it; `npm test` passes.
 
-- [ ] **B6 · Ignore the server's runtime data file.**
+- [!] **B6 · Ignore the server's runtime data file.**
   `server/runs.json` is written at runtime and should never be committed.
   - Files: `.gitignore`
   - Done when: `grep -q 'server/runs.json' .gitignore` succeeds; `npm run build` still passes.
