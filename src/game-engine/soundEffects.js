@@ -13,6 +13,7 @@ export class AudioManager {
   gunshot() { this._noise(0.08); }                                 // shooter
   cheer() { this._sweep(300, 900, 0.4); }                          // wave cleared
   fanfare() { [523,659,784,1047].forEach((f,i)=>setTimeout(()=>this.ping(f),i*160)); } // arrival
+  refuel() { this._sweep(100, 420, 0.5); }                              // tank fill
   _blip(freq, type, dur, vol) {
     if (!this.ctx || !this.on) return;
     const o = this.ctx.createOscillator(), g = this.ctx.createGain();

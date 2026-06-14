@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { gameState, clamp } from '../game-engine/gameStateAndRules.js';
 import { ROUTE } from '../map-data/citiesAndRoute.js';
 import { FuelIcon } from './Icons.jsx';
+import { audio } from '../game-engine/soundEffects.js';
 
 const BASES = { refuel: 40, repair: 80 };
 
@@ -29,6 +30,7 @@ export default function CityStopShop({ index, onContinue }) {
     if (kind === 'refuel' && g.cash >= refuelCost && g.gas < 100) {
       g.cash = clamp(g.cash - refuelCost, 0, 99999);
       g.gas = 100;
+      audio.refuel();
     } else if (kind === 'repair' && g.cash >= repairCost && g.suvHealth < 100) {
       g.cash = clamp(g.cash - repairCost, 0, 99999);
       g.suvHealth = 100;
