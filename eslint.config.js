@@ -7,6 +7,15 @@ export default [
   { ignores: ['dist'] },
   js.configs.recommended,
   {
+    // Server code runs in Node, not the browser — give it Node globals (process, etc.)
+    files: ['server/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: { ...globals.node },
+    },
+  },
+  {
     files: ['**/*.{js,jsx}'],
     languageOptions: {
       ecmaVersion: 'latest',

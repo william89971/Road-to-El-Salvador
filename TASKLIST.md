@@ -23,9 +23,9 @@
 
 ## Ready — loop-able, one iteration each
 
-- [ ] **A1 · Make `npm run lint` pass cleanly.**
-  The gate itself is currently red: `process is not defined` in `server/index.js`, plus two unused-`before` warnings in the test file.
-  - Files: `eslint.config.js`, `server/index.js`, `src/game-engine/__tests__/gameRules.test.js`
+- [x] **A1 · Make `npm run lint` pass cleanly.** ✅ Verified: `npm run lint` exits 0, no errors/warnings; 50/50 tests pass; no new build warnings.
+  The gate itself was red: `process is not defined` in `server/index.js`, plus two unused-`before` warnings in the test file. Fixed by giving `server/` Node globals in the eslint config and deleting the two dead variables.
+  - Files: `eslint.config.js`, `src/game-engine/__tests__/gameRules.test.js`
   - Done when: `npm run lint` exits `0` with zero errors and zero warnings.
 
 - [ ] **A2 · Restore the trailing newline in `drivingScene3D.js`.**
