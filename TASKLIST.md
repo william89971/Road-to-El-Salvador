@@ -39,7 +39,7 @@
   - Files: `src/game-engine/leaderboardStorage.js`
   - Done when: `npm run build` output contains no `dynamically imported ... but also statically imported` warning.
 
-- [ ] **A4 · Re-enable pinch-zoom (accessibility).**
+- [x] **A4 · Re-enable pinch-zoom (accessibility).**
   The viewport meta sets `maximum-scale=1.0, user-scalable=no`, which blocks zoom — a WCAG failure.
   - Files: `index.html`
   - Done when: `grep -c 'user-scalable=no\|maximum-scale' index.html` returns `0`; build passes.
