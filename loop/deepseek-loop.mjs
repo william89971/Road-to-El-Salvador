@@ -141,7 +141,12 @@ async function runTask(task) {
     const paths = parsed.edits.map(e => e.path);
     // fall back to a task-derived message if the maker omitted ===COMMIT:===
     const commitMsg = parsed.commit || `Complete ${task.id}: ${task.title}`;
-    const diff = git('diff', '--', ...paths);
+    // Build a diff the checker can actually read: a real diff for edited files,
+    // plus full content for newly created files (untracked files don't show in
+    // `git diff`, which used to leave the checker reviewing an empty diff).
+    const editedPaths = parsed.edits.filter(e => e.type === 'edit').map(e => e.path);
+    let diff = editedPaths.length ? git('diff', '--', ...editedPaths) : '';
+    for (const e of parsed.edits) if (e.type === 'new') diff += `\n\n--- NEW FILE: ${e.path} ---\n${e.content}`;
     say(`• Checker (${CHECKER_MODEL}) is trying to refute it…`);
     const checkRaw = await callModel(CHECKER_MODEL, checkerMessages(task, diff, commitMsg));
     const verdict = parseVerdict(checkRaw.content);
@@ -207,6 +212,19 @@ function makerMessages(task, priorError) {
   }).join('\n\n');
   const tree = git('ls-files', 'src', 'server', 'index.html', 'eslint.config.js').trim();
 
+  // Style reference: if the task involves tests, show an existing test so the
+  // maker matches this project's framework, imports, and conventions instead of
+  // guessing (the #1 reason test-writing tasks used to fail the gate).
+  let references = '';
+  if (/\btest\b/i.test(task.body)) {
+    const pool = git('ls-files', '*.test.js').trim().split('\n').filter(Boolean);
+    const prefer = /server/i.test(task.body) ? pool.find(p => p.startsWith('server/')) : pool.find(p => p.startsWith('src/'));
+    const ref = prefer || pool[0];
+    if (ref && existsSync(join(ROOT, ref))) {
+      references = `\n\nSTYLE REFERENCE — an existing test in this project. Match its imports, structure, and assertion style:\n--- ${ref} ---\n${readFileSync(join(ROOT, ref), 'utf8')}`;
+    }
+  }
+
   const sys = `You are a careful senior engineer making ONE small change in an existing repo.
 Rules:
 - Make the SMALLEST change that satisfies the task's "Done when" check. Touch nothing unrelated.
@@ -229,7 +247,7 @@ Output ONLY these blocks, nothing else. Use EDIT to change an existing file (str
 
 You may include multiple EDIT/NEW blocks. The SEARCH text must match the file exactly or the edit is rejected.`;
 
-  const usr = `PROJECT RULES:\n${rules}\n\nDEFINITION OF DONE:\n${dod}\n\nREPO FILES:\n${tree}\n\nTASK ${task.id}: ${task.title}\n${task.body}\n\nCURRENT CONTENTS OF FILES IN SCOPE:\n${fileBlobs}` +
+  const usr = `PROJECT RULES:\n${rules}\n\nDEFINITION OF DONE:\n${dod}\n\nREPO FILES:\n${tree}\n\nTASK ${task.id}: ${task.title}\n${task.body}\n\nCURRENT CONTENTS OF FILES IN SCOPE:\n${fileBlobs}${references}` +
     (priorError ? `\n\nYOUR PREVIOUS ATTEMPT FAILED. Fix it. Details:\n${priorError}` : '');
 
   return [{ role: 'system', content: sys }, { role: 'user', content: usr }];
