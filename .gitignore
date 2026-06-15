@@ -5,6 +5,9 @@ logs
 # DeepSeek loop runtime artifacts (the machine's diary + emergency stop switch)
 loop/loop-log.md
 loop/STOP
+
+# Server runtime data (generated at runtime, not source)
+server/runs.json
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
