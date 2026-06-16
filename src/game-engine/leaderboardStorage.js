@@ -1,17 +1,28 @@
-// Leaderboard storage — tries the backend API first, falls back to localStorage.
+import { gameState } from './gameState.js';
+
+// Leaderboard storage — tries the backend API first, falls back to an in-memory
+// buffer. We intentionally do not use localStorage/sessionStorage because some
+// environments (e.g., Claude artifacts) block them.
 const API_BASE = '/api';
-const STORAGE_PREFIX = 'btc_run:';
+
+// In-memory fallback when the backend is unreachable. Not persisted across
+// page reloads, which matches the original design contract.
+const fallbackRuns = [];
+
+// Test-only helper to reset the in-memory fallback between tests.
+export function __resetFallbackRuns() {
+  fallbackRuns.length = 0;
+}
 
 async function tryApi(path, opts) {
   try {
     const res = await fetch(`${API_BASE}${path}`, opts);
     if (res.ok) return await res.json();
-  } catch { /* server unreachable — use localStorage fallback */ }
+  } catch { /* server unreachable — use in-memory fallback */ }
   return null;
 }
 
 export async function saveRun() {
-  const { gameState } = await import('./gameStateAndRules.js');
   const run = {
     name: gameState.playerName || 'Anon',
     btc: gameState.btc,
@@ -28,12 +39,10 @@ export async function saveRun() {
   });
   if (remote) return;
 
-  // fall back to localStorage
-  try {
-    localStorage.setItem(STORAGE_PREFIX + Date.now(), JSON.stringify(run));
-  } catch (e) {
-    console.warn('leaderboard save failed', e);
-  }
+  // in-memory fallback
+  fallbackRuns.push({ ...run, ts: Date.now() });
+  // cap fallback size to avoid unbounded growth
+  if (fallbackRuns.length > 100) fallbackRuns.shift();
 }
 
 export async function topRuns(n = 10) {
@@ -41,20 +50,9 @@ export async function topRuns(n = 10) {
   const remote = await tryApi(`/runs?n=${n}`);
   if (remote && Array.isArray(remote)) return remote;
 
-  // fall back to localStorage
-  try {
-    const runs = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (!key || !key.startsWith(STORAGE_PREFIX)) continue;
-      try {
-        const raw = localStorage.getItem(key);
-        if (raw) runs.push(JSON.parse(raw));
-      } catch { /* skip corrupt entries */ }
-    }
-    return runs.sort((a, b) => b.btcValue - a.btcValue).slice(0, n);
-  } catch (e) {
-    console.warn('leaderboard read failed', e);
-    return [];
-  }
+  // in-memory fallback
+  return fallbackRuns
+    .slice()
+    .sort((a, b) => b.btcValue - a.btcValue)
+    .slice(0, n);
 }

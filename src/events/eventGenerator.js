@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { DEV_MODE, gameState } from '../game-engine/gameStateAndRules.js';
 
 const MOCK_EVENTS = [
@@ -13,7 +12,7 @@ const MOCK_EVENTS = [
     description: 'Your phone buzzes nonstop. The stack you almost sold in Tijuana is now worth a lot more.',
     canFight: false,
     choices: [
-      { label: 'HODL and keep driving', consequence: 'Diamond hands intact.', effects: { vibes: 1, purchasingPower: 0 } },
+      { label: 'HODL and keep driving', consequence: 'Diamond hands intact.', effects: { vibes: 1 } },
       { label: 'Celebrate with tacos', consequence: 'Morale up, wallet down.', effects: { cash: -30, vibes: 1 } },
     ] },
   { headline: 'Bandits Block the Road', dateline: 'ROADSIDE REPORT — Day X',
@@ -32,42 +31,52 @@ const MOCK_EVENTS = [
     ] },
 ];
 
-export async function getEvent() {
-  if (DEV_MODE) {
-    const pool = MOCK_EVENTS.filter(e => !gameState.recentEventTitles.includes(e.headline));
-    const e = (pool.length ? pool : MOCK_EVENTS)[Math.floor(Math.random() * (pool.length || MOCK_EVENTS.length))];
-    return { ...e, dateline: e.dateline.replace('Day X', `Day ${gameState.days}`) };
-  }
-  try {
-    const client = new Anthropic({ apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY, dangerouslyAllowBrowser: true });
-    // TODO production: move this call behind a Vercel serverless fn at /api/event to hide the key
-    const msg = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 500,
-      messages: [{ role: 'user', content: buildPrompt() }],
-    });
-    const text = msg.content.map(b => b.text || '').join('').replace(/```json|```/g, '').trim();
-    return JSON.parse(text);
-  } catch (err) {
-    console.error('Event API failed, using mock:', err);
-    return MOCK_EVENTS[Math.floor(Math.random() * MOCK_EVENTS.length)];
-  }
+function buildSnapshot() {
+  const s = gameState;
+  return {
+    currentCity: s.currentCity,
+    currentCountry: s.currentCountry,
+    biome: s.biome,
+    miles: s.miles,
+    gas: s.gas,
+    suvHealth: s.suvHealth,
+    vibes: s.vibes,
+    cash: s.cash,
+    purchasingPower: s.purchasingPower,
+    btc: s.btc,
+    btcPrice: s.btcPrice,
+    days: s.days,
+    recentEventTitles: s.recentEventTitles,
+  };
 }
 
-function buildPrompt() {
-  const s = gameState;
-  return `You are the narrator for "Bitcoin Road Trip", a road trip game from LA to El Salvador.
-Game state:
-- Location: ${s.currentCity}, ${s.currentCountry} | Miles: ${Math.round(s.miles)}/2800
-- Gas ${Math.round(s.gas)}% | SUV ${Math.round(s.suvHealth)}% | Vibes ${s.vibes}/5
-- Cash $${Math.round(s.cash)} (purchasing power ${Math.round(s.purchasingPower)}%) | BTC ${s.btc} at $${s.btcPrice}
-- Recent events (don't repeat): ${s.recentEventTitles.join(', ') || 'none'}
+function pickMockEvent() {
+  const pool = MOCK_EVENTS.filter((e) => !gameState.recentEventTitles.includes(e.headline));
+  const source = pool.length ? pool : MOCK_EVENTS;
+  const e = source[Math.floor(Math.random() * source.length)];
+  return { ...e, dateline: e.dateline.replace('Day X', `Day ${gameState.days}`) };
+}
 
-Return ONLY valid JSON:
-{"headline":"<=8 words","dateline":"CITY DAILY — Day ${s.days}","description":"2-3 sentences, grounded in the real region, funny/tense/human","canFight":false,
-"choices":[{"label":"<=8 words","consequence":"1 sentence","effects":{"gas":0,"cash":-60,"btc":0,"suvHealth":-10,"vibes":1,"purchasingPower":0}},
-{"label":"<=8 words","consequence":"1 sentence","effects":{"gas":-15,"cash":0,"btc":0,"suvHealth":0,"vibes":-1,"purchasingPower":0}}]}
-Rules: canFight:true only for physical threats (bandits/checkpoint/ambush) and adds a "Stand your ground" option client-side.
-Tailor to region (Baja desert, Oaxaca culture, Guatemala volcanic). Some events reference hard money (rising prices, peso crash, vendors preferring BTC).
-Cash effects $20-200, BTC 0.001-0.01, purchasingPower -5 to +3. Never drain >25% of a resource.`;
+export async function getEvent() {
+  if (DEV_MODE) {
+    return pickMockEvent();
+  }
+
+  try {
+    const res = await fetch('/api/event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildSnapshot()),
+    });
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    const ev = await res.json();
+    // Basic shape validation
+    if (!ev || !ev.headline || !Array.isArray(ev.choices)) {
+      throw new Error('Invalid event shape from server');
+    }
+    return ev;
+  } catch (err) {
+    console.error('Event API failed, using mock:', err);
+    return pickMockEvent();
+  }
 }

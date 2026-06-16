@@ -1,30 +1,120 @@
-# 🚀 Road to El Salvador - Advanced Production Backlog
+# 🛻₿ Road to El Salvador — Verifiable Backlog
 
-## Phase 1: Hyper-Realistic Graphics & Rendering
-- [ ] **Implement Physically Based Rendering (PBR):** Upgrade all standard materials to PBR materials. Ensure all 3D assets have albedo, normal, roughness, and metalness maps for realistic light interaction.
-- [ ] **Post-Processing Pipeline:** Integrate an effect composer with Screen Space Ambient Occlusion (SSAO) for deep shadows in corners, Bloom for glowing elements (like holographic UI or neon lights), and Depth of Field for cinematic focus.
-- [ ] **Advanced Lighting & Shadows:** Replace basic lighting with High Dynamic Range (HDRI) environment maps for realistic sky/ambient lighting. Enable soft shadow mapping and directional light cascades to prevent shadow pixelation.
-- [ ] **Dynamic Particle Systems:** Build a custom GPU-instanced particle system for environmental effects (smoke from ruins, sparks, rain, dust motes) that react to in-game wind or explosions.
-- [ ] **Custom GLSL Shaders:** Write custom shaders for complex materials that standard Three.js can't handle out-of-the-box (e.g., realistic water with refraction, glass distortion, or glitch-art effects for corrupted digital systems).
+> **This file is the loop's memory and contract.** It is read at the start of every iteration.
+> Every "Ready" task is sized for **one** iteration and carries an explicit, machine-checkable
+> **Done when** check. A task may be marked `[x]` **only** when its Done-when check passes *and*
+> the Definition of Done below holds. If you cannot make the check pass, mark it `[!]` with a
+> one-line reason and move on — **never** check off a task you did not actually verify, and
+> **never** write a commit message that claims more than the diff does. (See the PBR incident:
+> a commit claimed "all assets have normal/roughness/metalness maps" while changing 8 lines and
+> adding zero maps. That is the exact failure this format exists to prevent.)
 
-## Phase 2: Immersive Audio Engineering
-- [ ] **3D Spatial Audio:** Implement the Web Audio API (or THREE.PositionalAudio) so sound effects attenuate (get quieter) and pan (left/right ear) based strictly on the camera's position relative to the sound source.
-- [ ] **Dynamic Soundtrack System:** Create an audio manager that smoothly crossfades background music tracks based on the player's state (e.g., ambient tracks for exploring, high-tension tracks when resources drop to critical levels).
-- [ ] **Audio Ducking:** Configure the audio mix so background music and ambient noise automatically lower in volume when important UI alerts or critical narrative sounds trigger.
+## Definition of Done — applies to EVERY task
+1. `npm run build` completes with **no new** warnings (baseline below).
+2. `npm test` passes; any test the task adds also passes.
+3. `npm run lint` exits **0** with no errors or warnings. *(Check the real exit code, not a piped one.)*
+4. The commit message describes **only** what the diff actually does. No claim the diff doesn't substantiate.
+5. The task's own **Done when** check passes.
 
-## Phase 3: Production-Grade Performance Optimization
-- [ ] **Texture Compression:** Convert all heavy .png or .jpg textures to KTX2/Basis format. This drastically reduces GPU memory usage and allows high-res textures to load almost instantly.
-- [ ] **Level of Detail (LOD) Manager:** Implement LOD for complex 3D models. The engine should automatically swap to low-poly versions of buildings or objects when they are far away from the camera.
-- [ ] **Instanced Rendering:** Use InstancedMesh for repeated objects (trees, debris, scattered items) to render thousands of objects in a single draw call, maintaining 60fps.
-- [ ] **Web Worker Offloading:** Move heavy computations (like complex pathfinding, large-scale economy calculations, or physics steps) off the main thread into Web Workers to prevent UI stuttering.
+**Known build baseline (do not blame these on your task):**
+- `(!) Some chunks are larger than 500 kB` — pre-existing; only B3 may touch it.
 
-## Phase 4: Complex Mechanics & Backend Architecture
-- [ ] **Dynamic Economy Simulation:** Implement a backend system that tracks a fluctuating in-game currency (simulating Bitcoin scarcity/hyperinflation) that affects vendor prices and loot tables globally.
-- [ ] **State Machine AI:** Upgrade NPC or enemy behaviors using finite state machines (e.g., idle -> investigate -> chase -> flee based on the player's actions).
-- [ ] **Persistent Multi-Layer Saves:** Build a save system that uses IndexedDB for robust local caching (handling disconnects gracefully) and syncs securely to the Express backend.
-- [ ] **Anti-Cheat Measures:** Implement server-side validation on the Express backend to verify game states and leaderboard submissions, preventing players from spoofing high scores via the console.
+---
 
-## Phase 5: AAA-Level UI/UX and Polish
-- [ ] **Cinematic Onboarding:** Build an interactive tutorial seamlessly integrated into the game environment, teaching mechanics organically without massive text dumps.
-- [ ] **Fluid UI Animations:** Replace static UI components with Framer Motion (since you are using Next.js) or GSAP. Every menu, inventory slot, and tooltip should have satisfying micro-interactions (spring physics, ease-in-out scaling).
-- [ ] **Full Gamepad & Accessibility Support:** Map all controls to support controllers natively. Add accessibility options like UI scaling, colorblind-friendly palettes, and subtitle toggles.
+## Ready — loop-able, one iteration each
+
+- [x] **A1 · Make `npm run lint` pass cleanly.** ✅ Verified: `npm run lint` exits 0, no errors/warnings; 50/50 tests pass; no new build warnings.
+  The gate itself was red: `process is not defined` in `server/index.js`, plus two unused-`before` warnings in the test file. Fixed by giving `server/` Node globals in the eslint config and deleting the two dead variables.
+  - Files: `eslint.config.js`, `src/game-engine/__tests__/gameRules.test.js`
+  - Done when: `npm run lint` exits `0` with zero errors and zero warnings.
+
+- [x] **A2 · Restore the trailing newline in `drivingScene3D.js`.** ✅ Fixed by hand.
+  The PBR commit stripped the final newline (`\ No newline at end of file`).
+  *Lesson: invisible-whitespace / EOF tasks are a poor fit for an LLM loop (it must reproduce the whole region exactly for a one-byte change). These belong to a formatter (e.g. Prettier) or a human — don't feed them to the loop.*
+  - Files: `src/game-engine/drivingScene3D.js`
+  - Done when: `tail -c1 src/game-engine/drivingScene3D.js | od -An -c` shows `\n`; build still passes.
+
+- [x] **A3 · Remove the mixed static/dynamic import of `gameStateAndRules.js`.**
+  `leaderboardStorage.js` does `await import('./gameStateAndRules.js')` while every other file imports it statically, which triggers a Vite warning and prevents clean chunking. Import `gameState` statically from `./gameState.js` instead.
+  - Files: `src/game-engine/leaderboardStorage.js`
+  - Done when: `npm run build` output contains no `dynamically imported ... but also statically imported` warning.
+
+- [x] **A4 · Re-enable pinch-zoom (accessibility).**
+  The viewport meta sets `maximum-scale=1.0, user-scalable=no`, which blocks zoom — a WCAG failure.
+  - Files: `index.html`
+  - Done when: `grep -c 'user-scalable=no\|maximum-scale' index.html` returns `0`; build passes.
+
+- [x] **A5 · Unit-test `resetGame` difficulty multipliers.** ✅ Done by hand.
+  Starting cash should scale: tourist ×1.5, road_warrior ×1, satoshi ×0.5.
+  - Files: new test under `src/game-engine/__tests__/`
+  - Done when: a test asserts all three multipliers off the loadout's base cash; `npm test` passes with a higher test count than before.
+
+- [x] **A6 · Unit-test the leaderboard localStorage fallback.** ✅ Done by hand.
+  `topRuns(n)` should return entries sorted by `btcValue` descending and respect the `n` limit when the backend is unreachable.
+  - Files: new test under `src/game-engine/__tests__/` (stub `localStorage` and `fetch`)
+  - Done when: a test seeds 3 fake runs, asserts descending order and that `topRuns(2)` returns 2; `npm test` passes.
+
+- [x] **A7 · Unit-test event de-duplication in DEV_MODE.** ✅ Done by hand.
+  `getEvent()` must not return a headline already in `gameState.recentEventTitles` when an unused alternative exists.
+  - Files: new test under `src/game-engine/__tests__/`
+  - Done when: a test fills `recentEventTitles` with all-but-one headline and asserts the remaining one is returned; `npm test` passes.
+
+- [x] **A8 · Make the Express server testable: export `app`, listen only when run directly.**
+  `server/index.js` calls `app.listen` on import, so it can't be unit-tested. Guard the listen behind the run-as-main check and `export { app }`.
+  - Files: `server/index.js`
+  - Done when: importing the module does not bind a port; `export { app }` exists; `npm run lint` and `npm test` still pass.
+
+- [x] **A9 · Validate `btcValue` in `POST /api/runs` (depends on A8).** ✅ Done by hand.
+  Currently `Number("abc")` → `NaN` is written to `runs.json`. Reject non-finite or negative `btcValue` with HTTP 400.
+  - Files: `server/index.js`, new server test
+  - Done when: a test asserts `POST {btcValue:"abc"}` → 400 and a valid payload → 201; `npm test` passes.
+
+- [x] **A10 · Encode the anti-slop rule into the agent's project instructions.**
+  So the maker reads the contract every run, not just this file.
+  - Files: `.codewhale/instructions.md`
+  - Done when: the file states "commit messages must not claim more than the diff does" and "only check off a task when its Done-when check passes"; `grep -q 'Done-when' .codewhale/instructions.md` succeeds.
+
+- [x] **B1 · Unit-test `endGame()`.**
+  `endGame(reason)` in `gameState.js` should set `gameState.screen` to `'gameover'` and `gameState.gameoverReason` to the passed-in reason.
+  - Files: new test under `src/game-engine/__tests__/`
+  - Done when: a test imports `endGame` and `gameState`, calls `endGame('out of gas')`, and asserts `screen === 'gameover'` and `gameoverReason === 'out of gas'`; `npm test` passes with more tests than before.
+
+- [x] **B2 · Unit-test `tick` gas/health loss conditions.** ✅ Done by hand (loop blocked it).
+  In `gameRules.js`, when `gas` hits 0 or `suvHealth` hits 0 during a tick, the game must end (`screen` becomes `'gameover'`). Only the `vibes` case is currently covered.
+  - Files: new test under `src/game-engine/__tests__/`
+  - Done when: tests put the game in a playing state (`screen:'playing'`, `paused:false`), drive `gas` to 0 (and, separately, `suvHealth` to 0) via `tick`, and assert the game ends; `npm test` passes.
+
+- [x] **B3 · Unit-test `applyEffects` clamping bounds.**
+  `applyEffects` in `gameRules.js` clamps each resource: `vibes` 0–5, `purchasingPower` 1–100, `cash` 0–99999, `btc` 0–99, `gas`/`suvHealth` 0–100.
+  - Files: new test under `src/game-engine/__tests__/`
+  - Done when: tests assert a large positive `vibes` effect caps at 5 and a large negative `cash` effect floors at 0; `npm test` passes.
+
+- [x] **B4 · Unit-test `GET /api/runs` sorting and limit.** ✅ Done by hand (loop blocked it).
+  `GET /api/runs` returns runs sorted by `btcValue` descending, limited by the `n` query param.
+  - Files: new test under `server/__tests__/`
+  - Done when: a test (using its own temp `RUNS_FILE` and `app.listen(0)`, like `server/__tests__/api.test.js`) seeds 3 runs, requests `GET /api/runs?n=2`, and asserts 2 results in descending `btcValue` order; `npm test` passes.
+
+- [x] **B5 · Add a `GET /api/health` endpoint.**
+  A standard health check for uptime monitoring.
+  - Files: `server/index.js`, a server test
+  - Done when: `GET /api/health` responds 200 with JSON `{ "ok": true }`, and a test asserts it; `npm test` passes.
+
+- [x] **B6 · Ignore the server's runtime data file.** ✅ Done by hand (loop blocked it).
+  `server/runs.json` is written at runtime and should never be committed.
+  - Files: `.gitignore`
+  - Done when: `grep -q 'server/runs.json' .gitignore` succeeds; `npm run build` still passes.
+
+---
+
+## Parking lot — NOT loop-ready (reclassified from the old backlog)
+
+These need a **human** to confirm they're wanted for *this* small procedural game and to slice each
+into atomic, checkable tasks before any loop touches them. Some carried false premises (flagged).
+
+- **Post-processing (SSAO / Bloom / DoF), HDRI lighting, GPU particles, custom GLSL shaders** — large, and "looks better" is not machine-verifiable. Need a concrete, measurable target per effect (e.g. "bloom enabled on emissive tail-lights, frame time < 16 ms on the test scene").
+- **KTX2 / Basis texture compression** — ⚠️ false premise: there are **zero** texture asset files; the game is procedural geometry + canvas textures. Nothing to compress yet.
+- **LOD manager, InstancedMesh, Web Worker offloading** — real perf ideas, but need a profiled bottleneck first. Don't optimize blind.
+- **3D spatial audio, dynamic soundtrack crossfade, audio ducking** — scope each to one sound path with an asserted gain/pan value.
+- **Dynamic economy backend, state-machine AI, IndexedDB saves, server-side anti-cheat** — multi-file features; A8/A9 are the first verifiable slices of the anti-cheat one.
+- **Cinematic onboarding, fluid UI animations, gamepad + accessibility** — ⚠️ false premise: the old note said "use Framer Motion **since you are using Next.js**." This project is **Vite + React**, not Next.js. A4 is the first real, checkable accessibility slice.
+- **Move event generation server-side** — `eventGenerator.js` ships `@anthropic-ai/sdk` to the browser with `dangerouslyAllowBrowser: true`, exposing the key (there's already a `TODO`). Ready to slice into: (1) add `/api/event` to the Express server, (2) point the client at it, (3) drop the SDK from the client bundle.

@@ -1,15 +1,16 @@
-import { gameState, clamp } from './gameStateAndRules.js';
+import { gameState } from './gameStateAndRules.js';
+import { spendCash, adjustBTC, adjustPurchasingPower, adjustVibes, incrementEnemiesDefeated } from './gameActions.js';
 import { BIOMES } from '../map-data/citiesAndRoute.js';
 import { audio } from './soundEffects.js';
 
 // Enemy archetypes. `breach` applies a loss to gameState when one reaches the
 // bottom; `kill` applies a reward (only the Central Banker has one).
 const TYPES = {
-  bandit:    { color: '#c0392b', label: '🦹', hp: 1, w: 46, h: 58, breach: () => { gameState.cash = clamp(gameState.cash - rand(50, 150), 0, 99999); } },
-  agent:     { color: '#8a8f99', label: '🕴️', hp: 1, w: 44, h: 60, breach: () => { gameState.btc = clamp(+(gameState.btc - randf(0.005, 0.01)).toFixed(4), 0, 99); } },
-  hacker:    { color: '#26c6da', label: '💻', hp: 1, w: 44, h: 56, breach: () => { gameState.btc = clamp(+(gameState.btc - randf(0.003, 0.008)).toFixed(4), 0, 99); } },
-  banker:    { color: '#3f6fd1', label: '🏦', hp: 5, w: 54, h: 66, breach: () => { gameState.purchasingPower = clamp(gameState.purchasingPower - 4, 1, 100); },
-               kill: () => { gameState.purchasingPower = clamp(gameState.purchasingPower + 5, 1, 100); } },
+  bandit:    { color: '#c0392b', label: '🦹', hp: 1, w: 46, h: 58, breach: () => { spendCash(rand(50, 150)); } },
+  agent:     { color: '#8a8f99', label: '🕴️', hp: 1, w: 44, h: 60, breach: () => { adjustBTC(-randf(0.005, 0.01)); } },
+  hacker:    { color: '#26c6da', label: '💻', hp: 1, w: 44, h: 56, breach: () => { adjustBTC(-randf(0.003, 0.008)); } },
+  banker:    { color: '#3f6fd1', label: '🏦', hp: 5, w: 54, h: 66, breach: () => { adjustPurchasingPower(-4); },
+               kill: () => { adjustPurchasingPower(5); } },
 };
 
 function rand(a, b) { return Math.round(a + Math.random() * (b - a)); }
@@ -115,7 +116,7 @@ export class WaveShooter {
   kill(en) {
     en.dying = true; en.dieT = 0;
     this.defeated++;
-    gameState.enemiesDefeated++;
+    incrementEnemiesDefeated();
     this.burst(en.x, en.y, en.color, 18);
     if (en.kill) en.kill();
   }
@@ -227,7 +228,7 @@ export class WaveShooter {
     if (this.done) return;
     this.done = true;
     cancelAnimationFrame(this._raf);
-    if (outcome === 'fled') gameState.vibes = clamp(gameState.vibes - 1, 0, 5);
+    if (outcome === 'fled') adjustVibes(-1);
     if (outcome === 'cleared' || outcome === 'survived') audio.cheer();
     this.dispose();
     this.onComplete({ outcome, defeated: this.defeated });

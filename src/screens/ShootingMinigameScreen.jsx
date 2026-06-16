@@ -35,6 +35,10 @@ export default function ShootingMinigameScreen({ biome, onDone }) {
     return () => clearTimeout(t);
   }, [phase]);
 
+  const flee = () => {
+    engineRef.current?.finish?.('fled');
+  };
+
   return (
     <div style={st.wrap}>
       <canvas ref={canvasRef} style={st.canvas} />
@@ -44,8 +48,14 @@ export default function ShootingMinigameScreen({ biome, onDone }) {
           <div style={{ fontSize: 64 }}>⚠️</div>
           <div style={st.introTitle}>AMBUSH!</div>
           <div style={st.introSub}>Tap the threats before they reach your stack. Ammo = vibes × 3.</div>
-          <div style={st.introSub}>You have {Math.max(3, gameState.vibes * 3)} shots · ESC to flee</div>
+          <div style={st.introSub}>You have {Math.max(3, gameState.vibes * 3)} shots · ESC or ↙ to flee</div>
         </div>
+      )}
+
+      {phase === 'fight' && (
+        <button style={st.fleeBtn} onClick={flee} aria-label="Flee ambush">
+          ↙ FLEE
+        </button>
       )}
 
       {phase === 'result' && result && (
@@ -63,8 +73,8 @@ export default function ShootingMinigameScreen({ biome, onDone }) {
 }
 
 const st = {
-  wrap: { position: 'fixed', inset: 0, zIndex: 1000, cursor: 'crosshair', background: '#0d0b09' },
-  canvas: { position: 'absolute', inset: 0, display: 'block' },
+  wrap: { position: 'fixed', inset: 0, zIndex: 1000, cursor: 'crosshair', background: '#0d0b09', touchAction: 'none' },
+  canvas: { position: 'absolute', inset: 0, display: 'block', touchAction: 'none' },
   intro: { position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', alignContent: 'center', gap: 6, textAlign: 'center', color: 'var(--paper)', background: 'rgba(13,11,9,0.85)', animation: 'fadeIn 0.3s ease', pointerEvents: 'none' },
   introTitle: { fontFamily: 'var(--font-title)', fontSize: 'clamp(48px,12vw,84px)', color: 'var(--danger)', lineHeight: 1 },
   introSub: { fontFamily: 'var(--font-num)', fontSize: 15, color: '#d8c7a6' },
@@ -72,5 +82,11 @@ const st = {
   resultTitle: { fontFamily: 'var(--font-title)', fontSize: 'clamp(40px,10vw,72px)', lineHeight: 1 },
   resultSub: { fontFamily: 'var(--font-news)', fontStyle: 'italic', fontSize: 17, color: '#d8c7a6' },
   resultStat: { fontFamily: 'var(--font-num)', fontSize: 15, color: '#b6a98c' },
-  btn: { marginTop: 12, padding: '14px 26px', fontSize: 22, borderRadius: 12, background: 'var(--btc)', color: '#1a1411' },
+  btn: { marginTop: 12, padding: '14px 26px', fontSize: 22, borderRadius: 12, background: 'var(--btc)', color: '#1a1411', minHeight: 44, minWidth: 44 },
+  fleeBtn: {
+    position: 'absolute', bottom: 16, left: 16, zIndex: 1001,
+    padding: '10px 16px', fontSize: 16, borderRadius: 10,
+    background: 'rgba(192,57,43,0.85)', color: '#fff',
+    minHeight: 44, minWidth: 80,
+  },
 };

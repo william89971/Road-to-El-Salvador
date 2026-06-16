@@ -296,7 +296,6 @@ describe('tick', () => {
   it('BTC price updates when random threshold met', () => {
     vi.restoreAllMocks();
     vi.spyOn(Math, 'random').mockReturnValue(0.1); // below 0.5 → triggers BTC update
-    const before = gameState.btcPrice;
     tick(2); // dt * 0.5 = 1.0 > 0.1 → update fires
     // price may change
     const historyLen = gameState.btcPriceHistory.length;
@@ -364,7 +363,6 @@ describe('BTC price random walk', () => {
 
   it('BTC price moves within expected range', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.3); // (0.3 - 0.46) * 1800 ≈ -288
-    const before = gameState.btcPrice;
     tick(2);
     // price change is capped to max 1800 range, won't exceed 64000+1800
     expect(gameState.btcPrice).toBeLessThan(66000);

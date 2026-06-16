@@ -57,8 +57,18 @@ export default function HeadsUpDisplay({ onToggleMap, onTogglePause, onToggleMut
 
   return (
     <>
+      <style>{`
+        @media (max-width: 420px) {
+          .hud-tr { width: min(200px, 46vw) !important; padding: 8px !important; }
+          .hud-tr .hud-cols { grid-template-columns: 1fr !important; }
+          .hud-tr .hud-title { font-size: 13px !important; }
+          .hud-tr .hud-fiat { font-size: 11px !important; }
+          .hud-tl { width: min(150px, 40vw) !important; padding: 8px !important; }
+          .hud-bottom { width: min(96vw, 640px) !important; }
+        }
+      `}</style>
       {/* top-left: vehicle resources */}
-      <div style={s.tl}>
+      <div style={s.tl} className="hud-tl">
         <Bar icon={<FuelIcon size={18} />} value={g.gas} color="#e8b04a" low />
         <Bar icon={<RigIcon size={18} />} value={g.suvHealth} color="#7fa6c9" low />
         <div style={s.vibesRow}>
@@ -79,13 +89,13 @@ export default function HeadsUpDisplay({ onToggleMap, onTogglePause, onToggleMut
       </div>
 
       {/* top-right: HARD MONEY widget */}
-      <div style={s.tr}>
-        <div style={s.widgetTitle}>HARD&nbsp;MONEY</div>
-        <div style={s.cols}>
+      <div style={s.tr} className="hud-tr">
+        <div style={s.widgetTitle} className="hud-title">HARD&nbsp;MONEY</div>
+        <div style={s.cols} className="hud-cols">
           {/* fiat column */}
           <div style={s.col}>
             <div style={s.colHead}><span style={s.headIcon}><CashIcon size={13} /></span> CASH</div>
-            <div style={s.fiatLine}>
+            <div style={s.fiatLine} className="hud-fiat">
               <span style={s.dim}>${start}</span>
               <span style={s.arrow}>→</span>
               <span style={{ color: 'var(--danger)', fontWeight: 700 }}>${now}</span>
@@ -99,7 +109,7 @@ export default function HeadsUpDisplay({ onToggleMap, onTogglePause, onToggleMut
           {/* btc column */}
           <div style={s.col}>
             <div style={s.colHead}><span style={{ ...s.headIcon, color: 'var(--btc)' }}><BtcIcon size={13} /></span> STACK</div>
-            <div style={s.fiatLine}>
+            <div style={s.fiatLine} className="hud-fiat">
               <span style={s.dim}>{g.btc}</span>
               <span style={s.arrow}>→</span>
               <span style={{ color: 'var(--btc)', fontWeight: 700 }}>${btcValue.toLocaleString()}</span>
@@ -125,7 +135,7 @@ export default function HeadsUpDisplay({ onToggleMap, onTogglePause, onToggleMut
       </div>
 
       {/* bottom: progress */}
-      <div style={s.bottom}>
+      <div style={s.bottom} className="hud-bottom">
         <button style={s.mapBtn} onClick={onToggleMap} title="Map" aria-label="Map">
           <MapIcon size={16} />
         </button>

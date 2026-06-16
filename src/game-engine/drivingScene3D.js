@@ -269,12 +269,12 @@ export class ParallaxScene {
     this.scene.add(this.stars);
 
     // ---- shared materials (updated on biome change) ----
-    this.roadMat = new THREE.MeshLambertMaterial({ color: 0xffffff, map: makeRoadTexture() });
-    this.edgeMat = new THREE.MeshLambertMaterial({ color: 0xe8e8e0 });
-    this.dashMat = new THREE.MeshLambertMaterial({ color: 0xf5c518, emissive: 0x3a2c00 });
-    this.terrainMat = new THREE.MeshPhongMaterial({ color: new THREE.Color(biome.mid), map: makeTerrainTexture(), shininess: 8 });
-    this.mountainMat = new THREE.MeshPhongMaterial({ color: this.curMid.clone().multiplyScalar(0.6), shininess: 4 });
-    this.propMat = new THREE.MeshLambertMaterial({ color: this.curMid.clone().multiplyScalar(0.8) });
+    this.roadMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, metalness: 0.05, map: makeRoadTexture() });
+    this.edgeMat = new THREE.MeshStandardMaterial({ color: 0xe8e8e0, roughness: 0.7, metalness: 0.1 });
+    this.dashMat = new THREE.MeshStandardMaterial({ color: 0xf5c518, roughness: 0.6, metalness: 0.1, emissive: 0x3a2c00 });
+    this.terrainMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(biome.mid), roughness: 0.73, metalness: 0, map: makeTerrainTexture() });
+    this.mountainMat = new THREE.MeshStandardMaterial({ color: this.curMid.clone().multiplyScalar(0.6), roughness: 0.87, metalness: 0 });
+    this.propMat = new THREE.MeshStandardMaterial({ color: this.curMid.clone().multiplyScalar(0.8), roughness: 0.85, metalness: 0 });
     // fixed-color prop materials (natural colors, biome-independent)
     this.matFoliage = new THREE.MeshStandardMaterial({ color: 0x3a5a32, roughness: 1 });
     this.matFoliageDark = new THREE.MeshStandardMaterial({ color: 0x244a22, roughness: 1 });
