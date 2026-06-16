@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { gameState, clamp } from '../game-engine/gameStateAndRules.js';
+import { gameState } from '../game-engine/gameStateAndRules.js';
+import { spendCash, refuel, repairSUV, adjustVibes } from '../game-engine/gameActions.js';
 import { ROUTE } from '../map-data/citiesAndRoute.js';
 import { FuelIcon } from './Icons.jsx';
 import { audio } from '../game-engine/soundEffects.js';
@@ -28,14 +29,14 @@ export default function CityStopShop({ index, onContinue }) {
   const buy = (kind) => {
     const g = gameState;
     if (kind === 'refuel' && g.cash >= refuelCost && g.gas < 100) {
-      g.cash = clamp(g.cash - refuelCost, 0, 99999);
-      g.gas = 100;
+      spendCash(refuelCost);
+      refuel();
       audio.refuel();
     } else if (kind === 'repair' && g.cash >= repairCost && g.suvHealth < 100) {
-      g.cash = clamp(g.cash - repairCost, 0, 99999);
-      g.suvHealth = 100;
+      spendCash(repairCost);
+      repairSUV();
     } else if (kind === 'rest' && g.vibes < 5) {
-      g.vibes = clamp(g.vibes + 1, 0, 5);
+      adjustVibes(1);
     }
     bump((n) => n + 1);
   };

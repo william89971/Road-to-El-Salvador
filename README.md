@@ -8,33 +8,54 @@ Built with **React 18**, **Three.js**, the **Web Audio API**, and the **Claude A
 
 ![Drive](https://img.shields.io/badge/2800_miles-8_stops-f7931a)
 
-## Run it
+## Run it locally
 
 ```bash
 npm install
-npm run dev
+cd server && npm install && cd ..
+npm run dev:full
 ```
 
-Then open the printed local URL (default http://localhost:5173). The game is **fully playable
-with no API key** — `DEV_MODE = true` in `src/game/gameState.js` uses built-in mock events.
+This starts the Vite dev server on http://localhost:5173 and the Express API server on
+http://localhost:3001. The game is **fully playable with no API key** — `DEV_MODE = true` in
+`src/game-engine/gameConfig.js` uses built-in mock events.
+
+You can also run just the frontend:
+
+```bash
+npm run dev
+```
 
 Other scripts:
 
 ```bash
-npm run build     # production build to dist/ (zero errors)
-npm run preview   # serve the production build locally
+npm run build        # production build to dist/ (zero errors)
+npm run preview      # serve the production build locally
+npm run server       # start the Express leaderboard/event server
+npm test             # run unit + integration tests
+npm run test:coverage # run tests with coverage report
+npm run lint         # run ESLint
 ```
 
 ## Live AI events (optional)
 
 To have **Claude** generate region-aware events instead of the mock pool:
 
-1. Copy `.env.example` to `.env` and set `VITE_ANTHROPIC_API_KEY=sk-ant-...`
-2. Set `DEV_MODE = false` in `src/game/gameState.js`
+1. Copy `.env.example` to `.env` in the project root and set `ANTHROPIC_API_KEY=sk-ant-...`
+2. Start the server with `npm run server` (or `npm run dev:full`)
+3. Set `DEV_MODE = false` in `src/game-engine/gameConfig.js`
 
-> The browser SDK call uses `dangerouslyAllowBrowser` for local dev. For production, move the
-> call behind a serverless function (e.g. `/api/event` on Vercel) so the key is never shipped
-> to the client.
+The API key lives **only on the server**. The client calls `/api/event`; the server talks to Claude.
+
+## Deploy to Vercel
+
+1. Push this repo to GitHub.
+2. Import it in [Vercel](https://vercel.com) as a Vite project.
+3. Add the environment variables from `.env.example` in the Vercel dashboard:
+   - `ANTHROPIC_API_KEY` (optional, for live events)
+   - `CORS_ORIGIN` (your production domain)
+4. Deploy. `vercel.json` routes `/api/*` to the serverless function in `api/index.js` and all
+   other paths to the SPA.
 
 ## How to play
 
@@ -49,7 +70,7 @@ To have **Claude** generate region-aware events instead of the mock pool:
 - **Newspaper events:** choose how to respond. Some physical threats let you **Stand your ground**,
   opening the wave-shooter.
 - **Ambushes:** at Tegucigalpa (and on `canFight` events) defend your stack — tap threats before
-  they reach the line. Ammo = vibes × 3. `Esc` to flee (−1 vibe).
+  they reach the line. Ammo = vibes × 3. `Esc` or the **FLEE** button to flee (−1 vibe).
 - **Arrival:** reach San Salvador for the cinematic and your final scorecard.
 
 ## File guide — what each file does
@@ -58,45 +79,53 @@ Every file is named for what it contains, so you can find things by vibes.
 
 ```
 index.html                          the web page shell; loads the app + Google Fonts
+public/manifest.json                PWA manifest
+api/index.js                        Vercel serverless entrypoint for /api/*
+server/index.js                     Express server: leaderboard + /api/event
+.github/workflows/ci.yml            GitHub Actions: lint, test, build
 src/
-  appEntryPoint.jsx                 boots React and mounts the game into the page
-  GameController.jsx                THE BRAIN: runs the game loop, owns every screen,
-                                    wires city stops / events / ambushes / win + lose
-  globalStyles.css                  colors, fonts, and shared animations
+  appEntryPoint.jsx                 boots React, error boundary, mounts the game
+  GameController.jsx                THE BRAIN: wires screens, loop, events, ambushes
+  globalStyles.css                  colors, fonts, shared animations, a11y
 
   game-engine/                      the moving parts that make the game *work*
-    gameStateAndRules.js            the single source of truth: all stats + the rules
-                                    that change them every frame (fuel, inflation, BTC price)
-    drivingScene3D.js               the 3D side-scrolling road (sky, mountains, dust,
-                                    day/night) drawn with Three.js
-    truckModel3D.js                 builds the beat-up SUV 3D model (body, wheels, headlights)
-    shootingMinigame.js             the 2D click-to-shoot ambush minigame (enemies, waves, ammo)
-    soundEffects.js                 every sound, made in code (engine hum, pings, gunshots…)
-    leaderboardStorage.js           saves and loads high scores
+    gameConfig.js                   constants (DEV_MODE, miles, prices, loadouts)
+    gameState.js                    the single source of truth + reset/end helpers
+    gameRules.js                    tick + applyEffects
+    gameActions.js                  explicit action functions for state mutations
+    gameLoop.js                     requestAnimationFrame loop (tick, stops, arrival)
+    drivingScene3D.js               the 3D side-scrolling road drawn with Three.js
+    truckModel3D.js                 builds the beat-up SUV 3D model
+    shootingMinigame.js             the 2D click-to-shoot ambush minigame
+    soundEffects.js                 every sound, made in code
+    leaderboardStorage.js           saves and loads high scores (backend-first)
 
   events/
-    eventGenerator.js               makes the newspaper events — mock ones, or live from Claude
+    eventGenerator.js               mock events, or fetch from /api/event
 
   map-data/
-    citiesAndRoute.js               the 8 cities (LA → San Salvador) + each region's colors
+    citiesAndRoute.js               the 8 cities (LA → San Salvador) + biomes
 
   screens/                          everything you SEE (full screens + HUD overlays)
     StartScreen.jsx                 name + difficulty pick
-    HeadsUpDisplay.jsx              the in-game HUD (fuel/health/vibes + hard-money widget)
-    BitcoinPriceSparkline.jsx       the little BTC price chart inside the HUD
-    CityStopShop.jsx                the refuel / repair / rest shop at each city
-    NewspaperEventCard.jsx          the torn-paper newspaper event popup
-    ShootingMinigameScreen.jsx      the wrapper that shows the ambush minigame
-    RouteMapScreen.jsx              the map panel with your position dot
-    ArrivalCinematic.jsx            the "DEPLOYED TO PRODUCTION" victory cutscene
-    GameOverScreen.jsx              the you-lost screen
-    VictoryScreen.jsx               the you-won scorecard
-    LeaderboardScreen.jsx           the high-scores list
+    ErrorBoundary.jsx               crash fallback
+    HeadsUpDisplay.jsx              the in-game HUD
+    BitcoinPriceSparkline.jsx       the little BTC price chart
+    CityStopShop.jsx                refuel / repair / rest shop
+    NewspaperEventCard.jsx          torn-paper event popup
+    ShootingMinigameScreen.jsx      ambush minigame wrapper
+    RouteMapScreen.jsx              map panel with your position dot
+    ArrivalCinematic.jsx            victory cutscene
+    GameOverScreen.jsx              you-lost screen
+    VictoryScreen.jsx               you-won scorecard
+    LeaderboardScreen.jsx           high-scores list
 ```
 
 ## Tech notes
 
 - One Three.js/WebGL context (the parallax driving scene); the wave-shooter is a separate 2D canvas.
-- No `localStorage`/`sessionStorage`. The shared leaderboard uses `window.storage` (only present
-  when the game runs as a Claude artifact) and is fully guarded, so it simply shows empty elsewhere.
-- See `BUILD_SPEC.md` for the full design contract.
+- The leaderboard is backend-first (`/api/runs`); it falls back to an in-memory buffer if the server
+  is unreachable. No `localStorage`/`sessionStorage` is used.
+- The Anthropic API key never ships to the browser.
+- CI runs `npm run lint`, `npm test`, and `npm run build` on every PR.
+- See `BUILD_SPEC.md` for the original design contract and `TASKLIST.md` for the verifiable backlog.

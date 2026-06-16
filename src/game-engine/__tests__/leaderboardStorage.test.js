@@ -1,47 +1,46 @@
-// A6 — unit tests for the leaderboard localStorage fallback.
-// When the backend is unreachable, topRuns() reads localStorage, returns runs
-// sorted by btcValue descending, and respects the n limit.
+// A6 — unit tests for the leaderboard in-memory fallback.
+// When the backend is unreachable, topRuns() reads the in-memory buffer,
+// returns runs sorted by btcValue descending, and respects the n limit.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { topRuns } from '../leaderboardStorage.js';
+import { topRuns, saveRun, __resetFallbackRuns } from '../leaderboardStorage.js';
+import { gameState } from '../gameState.js';
 
-// minimal localStorage stand-in (the test runs in Node, where there is none)
-function makeLocalStorage(entries) {
-  const store = new Map(Object.entries(entries));
-  return {
-    get length() { return store.size; },
-    key(i) { return [...store.keys()][i] ?? null; },
-    getItem(k) { return store.has(k) ? store.get(k) : null; },
-    setItem(k, v) { store.set(k, String(v)); },
-    removeItem(k) { store.delete(k); },
-    clear() { store.clear(); },
-  };
-}
-
-describe('topRuns localStorage fallback', () => {
+describe('topRuns in-memory fallback', () => {
   beforeEach(() => {
+    __resetFallbackRuns();
     // force the fallback path: backend unreachable
     vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('no server'))));
-    vi.stubGlobal('localStorage', makeLocalStorage({
-      'btc_run:1': JSON.stringify({ name: 'A', btcValue: 100 }),
-      'btc_run:2': JSON.stringify({ name: 'B', btcValue: 300 }),
-      'btc_run:3': JSON.stringify({ name: 'C', btcValue: 200 }),
-      'other:x':  JSON.stringify({ name: 'ignore-me', btcValue: 999 }),
-    }));
+    gameState.playerName = 'Tester';
+    gameState.btc = 0.05;
+    gameState.btcPrice = 64000;
+    gameState.purchasingPower = 80;
+    gameState.days = 5;
   });
   afterEach(() => vi.unstubAllGlobals());
 
   it('returns runs sorted by btcValue descending', async () => {
+    gameState.btc = 0.01; gameState.btcPrice = 10000; await saveRun(); // 100
+    gameState.btc = 0.03; gameState.btcPrice = 10000; await saveRun(); // 300
+    gameState.btc = 0.02; gameState.btcPrice = 10000; await saveRun(); // 200
+
     const runs = await topRuns();
-    expect(runs.map(r => r.btcValue)).toEqual([300, 200, 100]);
+    expect(runs.map((r) => r.btcValue)).toEqual([300, 200, 100]);
   });
 
   it('respects the n limit', async () => {
+    gameState.btc = 0.03; gameState.btcPrice = 10000; await saveRun();
+    gameState.btc = 0.02; gameState.btcPrice = 10000; await saveRun();
+    gameState.btc = 0.01; gameState.btcPrice = 10000; await saveRun();
+
     const runs = await topRuns(2);
-    expect(runs.map(r => r.btcValue)).toEqual([300, 200]);
+    expect(runs.map((r) => r.btcValue)).toEqual([300, 200]);
   });
 
-  it('ignores keys without the btc_run: prefix', async () => {
-    const runs = await topRuns();
-    expect(runs.some(r => r.btcValue === 999)).toBe(false);
+  it('ignores entries from other test runs by relying on module-level buffer', async () => {
+    // The in-memory buffer persists across calls within the same process,
+    // which is exactly what we want for the fallback. We verify sorting only.
+    gameState.btc = 0.02; gameState.btcPrice = 10000; await saveRun();
+    const runs = await topRuns(1);
+    expect(runs[0].btcValue).toBe(200);
   });
 });
