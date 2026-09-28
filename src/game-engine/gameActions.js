@@ -61,7 +61,7 @@ export function incrementEnemiesDefeated() {
 export function rememberEventTitle(title) {
   if (!title) return;
   gameState.recentEventTitles.push(title);
-  if (gameState.recentEventTitles.length > 3) gameState.recentEventTitles.shift();
+  if (gameState.recentEventTitles.length > 8) gameState.recentEventTitles.shift();
 }
 
 export function setPurchasingPower(pp) {

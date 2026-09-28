@@ -29,6 +29,62 @@ const MOCK_EVENTS = [
       { label: 'Shrug and drive on', consequence: 'Your cash buys less now.', effects: { purchasingPower: -4 } },
       { label: 'Stack more sats later', consequence: 'A plan, at least.', effects: { vibes: 1, purchasingPower: -2 } },
     ] },
+  { headline: 'Night Mechanic in a Pemex Lot', dateline: 'BAJA BULLETIN — Day X',
+    description: 'A kid with a flashlight offers to top you off from a jerry can. He wants dollars, not a story.',
+    canFight: false,
+    choices: [
+      { label: 'Buy the gas', consequence: 'The needle climbs. So does his price.', effects: { gas: 30, cash: -45 } },
+      { label: 'Nurse what you have', consequence: 'You keep the cash and the worry.', effects: { vibes: -1 } },
+    ] },
+  { headline: 'Checkpoint Wants a Look', dateline: 'FEDERAL HIGHWAY — Day X',
+    description: 'Flashlights in the window. They are curious about the laptop and the foreign plates.',
+    canFight: false,
+    choices: [
+      { label: 'Pay the courtesy', consequence: 'The gate lifts. Your wallet does not.', effects: { cash: -60 } },
+      { label: 'Show the papers', consequence: 'An hour of questions. The engine idles hard.', effects: { gas: -8, vibes: -1 } },
+    ] },
+  { headline: 'Hail Cracks the Windshield', dateline: 'SIERRA REPORT — Day X',
+    description: 'A five-minute storm leaves a spiderweb across the glass. The wipers only make it worse.',
+    canFight: false,
+    choices: [
+      { label: 'Tape and drive', consequence: 'Ugly, but the road is still there.', effects: { suvHealth: -8, vibes: -1 } },
+      { label: 'Replace the glass', consequence: 'Clear view. Local prices.', effects: { cash: -90, suvHealth: 20 } },
+    ] },
+  { headline: 'Cousin With a Coin', dateline: 'FAMILY CHAT — Day X',
+    description: 'A voice note from home: "Sell a little, the dip looks real." The chart on your phone disagrees.',
+    canFight: false,
+    choices: [
+      { label: 'Sell a slice', consequence: 'Fiat in hand. Fewer sats forever.', effects: { btc: -0.005, cash: 80, vibes: -1 } },
+      { label: 'Leave it alone', consequence: 'The cousin is disappointed. The stack is not.', effects: { vibes: 1 } },
+    ] },
+  { headline: 'Roadside Kitchen', dateline: 'COMEDOR MILE MARKER — Day X',
+    description: 'Mole, tortillas, and a power outlet. The crew has not smiled since the last border.',
+    canFight: false,
+    choices: [
+      { label: 'Sit down and eat', consequence: 'An hour well spent.', effects: { cash: -25, vibes: 1 } },
+      { label: 'Keep rolling', consequence: 'Miles gained. Mood not.', effects: { vibes: -1 } },
+    ] },
+  { headline: 'Bridge Out Ahead', dateline: 'STATE POLICE — Day X',
+    description: 'A washed-out bridge. The detour is a dirt track that the SUV will feel in its bones.',
+    canFight: false,
+    choices: [
+      { label: 'Take the dirt track', consequence: 'You make it. The suspension remembers.', effects: { suvHealth: -18, gas: -12 } },
+      { label: 'Wait for the crew', consequence: 'They clear a lane by evening.', effects: { vibes: -1, gas: -6 } },
+    ] },
+  { headline: 'Someone Follows You Out of Town', dateline: 'NIGHT DRIVE — Day X',
+    description: 'The same headlights have sat two car-lengths back since the last Pemex. They match your speed.',
+    canFight: true,
+    choices: [
+      { label: 'Lose them in town', consequence: 'Side streets and a racing pulse.', effects: { gas: -10, vibes: -1 } },
+      { label: 'Pull over and pay', consequence: 'They wanted the glovebox, not a fight.', effects: { cash: -80 } },
+    ] },
+  { headline: 'Exchange Rate on a Napkin', dateline: 'CANTINA BLACKBOARD — Day X',
+    description: 'The owner will swap pesos for a sliver of bitcoin, priced like he has somewhere to be.',
+    canFight: false,
+    choices: [
+      { label: 'Take the bad rate', consequence: 'Cash now. Sats gone.', effects: { btc: -0.004, cash: 70 } },
+      { label: 'Walk out', consequence: 'You keep the stack and the hunger.', effects: { vibes: -1 } },
+    ] },
 ];
 
 function buildSnapshot() {

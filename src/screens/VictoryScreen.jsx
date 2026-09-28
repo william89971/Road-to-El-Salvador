@@ -6,7 +6,8 @@ export default function VictoryScreen({ onRestart, onMenu, onShowLeaderboard }) 
   const [shared, setShared] = useState(false);
 
   const btcValue = Math.round(g.btc * g.btcPrice);
-  const btcPct = Math.round((g.btcPrice / CONFIG.START_BTC_PRICE - 1) * 100);
+  const startValue = Math.round((g.startBtc ?? g.btc) * CONFIG.START_BTC_PRICE);
+  const btcPct = startValue ? Math.round((btcValue / startValue - 1) * 100) : 0;
   const ppLeft = Math.round(g.purchasingPower);
 
   const share = async () => {
@@ -41,7 +42,7 @@ export default function VictoryScreen({ onRestart, onMenu, onShowLeaderboard }) 
           <div style={st.hStack}>
             <div style={st.hLabel}>CASH POWER</div>
             <div style={{ ...st.hValue, color: 'var(--danger)' }}>{ppLeft}%</div>
-            <div style={st.hSub}>of what you started with</div>
+            <div style={st.hSub}>of the purchasing power you started with</div>
           </div>
         </div>
 

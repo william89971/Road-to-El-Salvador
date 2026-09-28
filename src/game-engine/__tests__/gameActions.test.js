@@ -95,14 +95,11 @@ describe('gameActions', () => {
     expect(gameState.enemiesDefeated).toBe(1);
   });
 
-  it('rememberEventTitle pushes titles and caps at 3', () => {
-    rememberEventTitle('A');
-    rememberEventTitle('B');
-    rememberEventTitle('C');
-    rememberEventTitle('D');
-    expect(gameState.recentEventTitles).toEqual(['B', 'C', 'D']);
+  it('rememberEventTitle pushes titles and caps at 8', () => {
+    for (const title of ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']) rememberEventTitle(title);
+    expect(gameState.recentEventTitles).toEqual(['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']);
     rememberEventTitle('');
-    expect(gameState.recentEventTitles).toEqual(['B', 'C', 'D']);
+    expect(gameState.recentEventTitles).toEqual(['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']);
   });
 
   it('setPurchasingPower and adjustPurchasingPower clamp between 1 and 100', () => {

@@ -1,16 +1,55 @@
 import { gameState } from './gameState.js';
 
-// Leaderboard storage — tries the backend API first, falls back to an in-memory
-// buffer. We intentionally do not use localStorage/sessionStorage because some
-// environments (e.g., Claude artifacts) block them.
+// Leaderboard storage — tries the backend API first, then localStorage, then an
+// in-memory buffer. Storage access is guarded because some embedded browsers
+// throw when localStorage is touched.
 const API_BASE = '/api';
 
-// In-memory fallback when the backend is unreachable. Not persisted across
-// page reloads, which matches the original design contract.
+// In-memory fallback when both the backend and localStorage are unavailable.
 const fallbackRuns = [];
+const STORAGE_KEY = 'btc-road-trip-runs';
 
-// Test-only helper to reset the in-memory fallback between tests.
+function storage() {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    return localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function readLocal() {
+  const ls = storage();
+  if (!ls) return null;
+  try {
+    const raw = ls.getItem(STORAGE_KEY);
+    if (raw == null) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return null;
+  }
+}
+
+function writeLocal(runs) {
+  const ls = storage();
+  if (!ls) return false;
+  try {
+    ls.setItem(STORAGE_KEY, JSON.stringify(runs.slice(-100)));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Test-only helper to reset fallback storage between tests.
 export function __resetFallbackRuns() {
+  fallbackRuns.length = 0;
+  try { storage()?.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+}
+
+// Test-only: drop the memory buffer without touching localStorage.
+export function __clearMemoryRuns() {
   fallbackRuns.length = 0;
 }
 
@@ -39,9 +78,11 @@ export async function saveRun() {
   });
   if (remote) return;
 
-  // in-memory fallback
-  fallbackRuns.push({ ...run, ts: Date.now() });
-  // cap fallback size to avoid unbounded growth
+  const entry = { ...run, ts: Date.now() };
+  const existing = readLocal() ?? [];
+  if (writeLocal([...existing, entry].slice(-100))) return;
+
+  fallbackRuns.push(entry);
   if (fallbackRuns.length > 100) fallbackRuns.shift();
 }
 
@@ -50,8 +91,9 @@ export async function topRuns(n = 10) {
   const remote = await tryApi(`/runs?n=${n}`);
   if (remote && Array.isArray(remote)) return remote;
 
-  // in-memory fallback
-  return fallbackRuns
+  const local = readLocal();
+  const source = local ?? fallbackRuns;
+  return source
     .slice()
     .sort((a, b) => b.btcValue - a.btcValue)
     .slice(0, n);

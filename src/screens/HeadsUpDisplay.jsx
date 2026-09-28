@@ -1,4 +1,5 @@
 import { gameState, CONFIG } from '../game-engine/gameStateAndRules.js';
+import { ROUTE } from '../map-data/citiesAndRoute.js';
 import BitcoinPriceSparkline from './BitcoinPriceSparkline.jsx';
 import { FuelIcon, RigIcon, CrewIcon, CashIcon, BtcIcon, PauseIcon, PlayIcon, MuteIcon, MapIcon } from './Icons.jsx';
 
@@ -55,6 +56,11 @@ export default function HeadsUpDisplay({ onToggleMap, onTogglePause, onToggleMut
   const VIBES_MAX = 5;
   const vibesLow = g.vibes <= VIBES_MAX * 0.2; // red below 20%, derived from max
 
+  const nextStop = ROUTE.find((stop) => stop.mile > g.miles + 0.5);
+  const rangeMi = g.gas / CONFIG.GAS_PER_MILE;
+  const gapMi = nextStop ? nextStop.mile - g.miles : 0;
+  const shortOnFuel = Boolean(nextStop) && rangeMi + 1 < gapMi;
+
   return (
     <>
       <style>{`
@@ -63,8 +69,9 @@ export default function HeadsUpDisplay({ onToggleMap, onTogglePause, onToggleMut
           .hud-tr .hud-cols { grid-template-columns: 1fr !important; }
           .hud-tr .hud-title { font-size: 13px !important; }
           .hud-tr .hud-fiat { font-size: 11px !important; }
-          .hud-tl { width: min(150px, 40vw) !important; padding: 8px !important; }
+          .hud-tl { width: min(168px, 46vw) !important; padding: 8px !important; }
           .hud-bottom { width: min(96vw, 640px) !important; }
+          .hud-controls { top: auto !important; bottom: 88px !important; left: 12px !important; transform: none !important; }
         }
       `}</style>
       {/* top-left: vehicle resources */}
@@ -85,6 +92,11 @@ export default function HeadsUpDisplay({ onToggleMap, onTogglePause, onToggleMut
               );
             })}
           </div>
+        </div>
+        <div style={{ ...s.rangeLine, color: shortOnFuel ? 'var(--danger)' : '#b6a98c' }}>
+          {shortOnFuel
+            ? `Short ${Math.round(gapMi - rangeMi)} mi to ${nextStop.name}`
+            : `Range ${Math.round(rangeMi)} mi${nextStop ? ` · ${nextStop.name} ${Math.round(gapMi)}` : ''}`}
         </div>
       </div>
 
@@ -125,7 +137,7 @@ export default function HeadsUpDisplay({ onToggleMap, onTogglePause, onToggleMut
       </div>
 
       {/* top-center controls */}
-      <div style={s.controls}>
+      <div style={s.controls} className="hud-controls">
         <button style={s.ctrlBtn} onClick={onTogglePause} title="Pause" aria-label="Pause">
           {g.paused ? <PlayIcon size={16} /> : <PauseIcon size={16} />}
         </button>
@@ -165,7 +177,7 @@ const panel = {
 };
 
 const s = {
-  tl: { ...panel, position: 'fixed', top: 12, left: 12, zIndex: 10, padding: '10px 12px', width: 190, display: 'flex', flexDirection: 'column', gap: 7 },
+  tl: { ...panel, position: 'fixed', top: 12, left: 12, zIndex: 10, padding: '10px 12px', width: 220, display: 'flex', flexDirection: 'column', gap: 7 },
   barRow: { display: 'flex', alignItems: 'center', gap: 7 },
   barIcon: { width: 18, display: 'flex', justifyContent: 'center', alignItems: 'center' },
   barTrack: { flex: 1, height: 9, background: 'rgba(0,0,0,0.5)', borderRadius: 5, overflow: 'hidden' },
@@ -173,6 +185,7 @@ const s = {
   barNum: { width: 26, textAlign: 'right', fontSize: 12, fontWeight: 700 },
   vibesRow: { display: 'flex', alignItems: 'center', gap: 7 },
   vibes: { display: 'flex', gap: 2, flex: 1, alignItems: 'center' },
+  rangeLine: { fontSize: 10.5, lineHeight: 1.3, letterSpacing: '0.01em' },
 
   tr: { ...panel, position: 'fixed', top: 12, right: 12, zIndex: 10, padding: '10px 12px', width: 234 },
   widgetTitle: { fontFamily: 'var(--font-title)', fontSize: 15, letterSpacing: '0.14em', color: 'var(--btc)', textAlign: 'center', marginBottom: 6 },

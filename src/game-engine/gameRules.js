@@ -15,12 +15,15 @@ export function applyEffects(e) {
 // call once per animation frame with delta seconds
 export function tick(dt) {
   if (gameState.paused || gameState.screen !== 'playing') return;
-  gameState.miles = clamp(gameState.miles + CONFIG.MILES_PER_SECOND * dt, 0, CONFIG.TOTAL_MILES);
-  gameState.gas = clamp(gameState.gas - 1.2 * dt, 0, 100);
+  const before = gameState.miles;
+  gameState.miles = clamp(before + CONFIG.MILES_PER_SECOND * dt, 0, CONFIG.TOTAL_MILES);
+  const gained = gameState.miles - before;
+  gameState.gas = clamp(gameState.gas - CONFIG.GAS_PER_MILE * gained, 0, 100);
+  gameState.suvHealth = clamp(gameState.suvHealth - CONFIG.SUV_WEAR_PER_MILE * gained, 0, 100);
   gameState.timeOfDay = (gameState.timeOfDay + dt / 120) % 1; // 2-min day
   gameState.days = Math.floor(gameState.miles / 40);
   gameState.purchasingPower = clamp(
-    gameState.purchasingPower * Math.pow(CONFIG.PP_DECAY_PER_TICK, dt * 60),
+    gameState.purchasingPower * Math.exp(-CONFIG.PP_DECAY_PER_MILE * gained),
     1,
     100,
   );

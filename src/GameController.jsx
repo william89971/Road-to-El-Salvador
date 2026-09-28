@@ -37,6 +37,7 @@ export default function GameController() {
   const [nameBanner, setNameBanner] = useState(null); // ROUTE stop shown as a cinematic banner
   const [webglError, setWebglError] = useState(false);
   const bannerTimerRef = useRef(null);
+  const pendingStopRef = useRef(null);
   const loopRef = useRef(null);
 
   // audio reaction bookkeeping
@@ -59,13 +60,16 @@ export default function GameController() {
       scene,
       onEventFire: fireEvent,
       onCityStop: (stop, index) => {
+        pendingStopRef.current = index;
         setNameBanner(stop);
         clearTimeout(bannerTimerRef.current);
         bannerTimerRef.current = setTimeout(() => {
+          if (pendingStopRef.current !== index) return;
+          pendingStopRef.current = null;
           setNameBanner(null);
           setCurrentStop(index);
           forceRender();
-        }, 3000);
+        }, 2600);
       },
       onAudioReact: reactAudio,
     });
@@ -152,9 +156,20 @@ export default function GameController() {
     eventDataRef.current = null;
     setEventData(null);
     clearTimeout(bannerTimerRef.current);
+    pendingStopRef.current = null;
     setNameBanner(null);
     loopRef.current?.resetEventTimer();
     resetAudioBookkeeping();
+    forceRender();
+  };
+
+  const skipBanner = () => {
+    const index = pendingStopRef.current;
+    if (index == null) return;
+    pendingStopRef.current = null;
+    clearTimeout(bannerTimerRef.current);
+    setNameBanner(null);
+    setCurrentStop(index);
     forceRender();
   };
 
@@ -194,6 +209,7 @@ export default function GameController() {
     setEventData(null);
     setShooter(null);
     clearTimeout(bannerTimerRef.current);
+    pendingStopRef.current = null;
     setNameBanner(null);
     loopRef.current?.resetEventTimer();
     resetAudioBookkeeping();
@@ -205,6 +221,7 @@ export default function GameController() {
     eventDataRef.current = null;
     setEventData(null);
     clearTimeout(bannerTimerRef.current);
+    pendingStopRef.current = null;
     setNameBanner(null);
     forceRender();
   };
@@ -250,7 +267,7 @@ export default function GameController() {
             <ShootingMinigameScreen biome={gameState.biome} onDone={endShooter} />
           )}
           {showMap && <RouteMapScreen onClose={() => setShowMap(false)} />}
-          {nameBanner && <NameBanner stop={nameBanner} />}
+          {nameBanner && <NameBanner stop={nameBanner} onSkip={skipBanner} />}
           {s.paused && s.cityStopIndex < 0 && !eventData && !nameBanner && (
             <div style={styles.pauseOverlay} onClick={togglePause}>
               <div style={{ fontFamily: 'var(--font-title)', fontSize: 48 }}>PAUSED</div>

@@ -9,6 +9,8 @@ export const gameState = {
   suvColor: '#7a8c6e',        // chosen SUV paint
   loadoutId: 'road_warrior',  // chosen starting loadout
   startCash: 800,             // cash at the start of this run (for the HUD baseline)
+  startBtc: 0.05,             // stack at the start of this run (for the scorecard)
+  cityStopIndex: -1,          // -1 = on the road; >= 0 = shop open at that stop
 
   miles: 0,
   days: 0,
@@ -45,9 +47,9 @@ export function resetGame(name, difficulty, loadout, suvColor = '#7a8c6e') {
     miles: 0, days: 0, currentCity: 'Los Angeles', currentCountry: 'USA',
     biome: 'california', timeOfDay: 0.35,
     gas: lo.gas, suvHealth: 100, vibes: 5,
-    cash, startCash: cash, btc: lo.btc,
+    cash, startCash: cash, btc: lo.btc, startBtc: lo.btc,
     btcPrice: CONFIG.START_BTC_PRICE, btcPriceHistory: [CONFIG.START_BTC_PRICE],
-    purchasingPower: 100, recentEventTitles: [], lastStopIndex: -1,
+    purchasingPower: 100, recentEventTitles: [], lastStopIndex: -1, cityStopIndex: -1,
     enemiesDefeated: 0, eventsSurvived: 0, gameoverReason: '',
   });
 }

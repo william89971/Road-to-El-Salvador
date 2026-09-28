@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { gameState } from '../game-engine/gameStateAndRules.js';
+import { gameState, CONFIG } from '../game-engine/gameStateAndRules.js';
 import { spendCash, refuel, repairSUV, adjustVibes } from '../game-engine/gameActions.js';
 import { ROUTE } from '../map-data/citiesAndRoute.js';
 import { FuelIcon } from './Icons.jsx';
@@ -42,6 +42,10 @@ export default function CityStopShop({ index, onContinue }) {
   };
 
   const g = gameState;
+  const next = ROUTE[index + 1];
+  const gapMi = next ? next.mile - g.miles : 0;
+  const rangeMi = g.gas / CONFIG.GAS_PER_MILE;
+  const shortOnFuel = Boolean(next) && rangeMi + 1 < gapMi;
 
   return (
     <div style={st.wrap}>
@@ -67,6 +71,13 @@ export default function CityStopShop({ index, onContinue }) {
             <div style={st.inflNote}>
               Local inflation <b>+{Math.round(100 / (g.purchasingPower / 100) - 100)}%</b> · Cash ${Math.round(g.cash)}
             </div>
+            {next && (
+              <div style={{ ...st.rangeNote, color: shortOnFuel ? 'var(--danger)' : '#d8c7a6' }}>
+                {shortOnFuel ? 'You will not reach ' : 'Next stop: '}
+                <b>{next.name}</b>
+                {` · ${Math.round(gapMi)} mi · your range ${Math.round(rangeMi)} mi`}
+              </div>
+            )}
 
             <div style={st.services}>
               <Service
@@ -118,7 +129,8 @@ const st = {
   city: { fontFamily: 'var(--font-title)', fontSize: 32, lineHeight: 1 },
   country: { fontSize: 13, color: '#b6a98c', letterSpacing: '0.06em' },
   flavor: { fontSize: 14, lineHeight: 1.5, color: '#d8c7a6', margin: '14px 0' },
-  inflNote: { fontSize: 12, color: '#b6a98c', marginBottom: 10, textAlign: 'center' },
+  inflNote: { fontSize: 12, color: '#b6a98c', marginBottom: 4, textAlign: 'center' },
+  rangeNote: { fontSize: 12.5, marginBottom: 10, textAlign: 'center', lineHeight: 1.4 },
   services: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 },
   service: { background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(245,230,202,0.2)', borderRadius: 10, padding: '12px 6px', color: 'var(--paper)', fontFamily: 'var(--font-num)', textAlign: 'center', transition: 'all 0.15s ease' },
   svcLabel: { fontFamily: 'var(--font-title)', fontSize: 18, marginTop: 4 },

@@ -24,7 +24,7 @@ export default function ShootingMinigameScreen({ biome, onDone }) {
     engineRef.current = engine;
     if (import.meta.env.DEV) window.__shooter = engine;
     engine.start();
-    return () => engine.finish?.('fled');
+    return () => engine.destroy?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 

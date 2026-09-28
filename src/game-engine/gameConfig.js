@@ -3,15 +3,26 @@
 
 export const DEV_MODE = true; // true = no API key needed, uses mock events
 
+// A full tank covers 1,400 miles. The longest single gap is Hermosillo →
+// Mexico City (780), so one fill always reaches the next city, but not two
+// long legs back to back. Purchasing power is tied to miles, not frame rate,
+// and lands near PP_END_RATIO at the border — cash still works, it just hurts.
+const TOTAL_MILES = 2800;
+const PP_END_RATIO = 0.25;
+
 export const CONFIG = {
-  TOTAL_MILES: 2800,
-  MILES_PER_SECOND: 3.5,        // base travel speed
+  TOTAL_MILES,
+  MILES_PER_SECOND: 8,          // ~6 minutes of driving for the full route
+  TANK_RANGE_MILES: 1400,
+  GAS_PER_MILE: 100 / 1400,
+  SUV_WEAR_PER_MILE: 12 / TOTAL_MILES, // the rig ages; events do the real damage
   START_CASH: 800,
   START_BTC: 0.05,
   START_BTC_PRICE: 64000,
-  PP_DECAY_PER_TICK: 0.99985,   // purchasing-power multiplier each tick (~0.5%/day feel)
-  EVENT_MIN_MS: 45000,
-  EVENT_MAX_MS: 90000,
+  PP_END_RATIO,
+  PP_DECAY_PER_MILE: -Math.log(PP_END_RATIO) / TOTAL_MILES,
+  EVENT_MIN_MS: 28000,
+  EVENT_MAX_MS: 52000,
 };
 
 // Starting loadouts (chosen on the start screen). cash is the base; the

@@ -29,7 +29,13 @@ function SuvPreview({ color }) {
   useEffect(() => {
     const canvas = canvasRef.current;
     const w = canvas.clientWidth || 220, h = canvas.clientHeight || 150;
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    let renderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    } catch (err) {
+      console.warn('SUV preview unavailable:', err);
+      return;
+    }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(w, h, false);
 
@@ -205,7 +211,7 @@ export default function StartScreen({ onStart, onShowLeaderboard }) {
         )}
 
         <div style={styles.hint}>
-          2,800 miles · 8 stops · newspaper events · wave-shooter ambushes
+          2,800 miles · a full tank will not cover every gap · refuel before the long legs
         </div>
       </div>
     </div>

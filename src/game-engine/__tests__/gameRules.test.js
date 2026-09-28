@@ -231,9 +231,10 @@ describe('tick', () => {
     expect(gameState.miles).toBeCloseTo(CONFIG.MILES_PER_SECOND * 2, 0);
   });
 
-  it('consumes gas based on dt', () => {
+  it('consumes gas based on miles traveled', () => {
     tick(10);
-    expect(gameState.gas).toBeCloseTo(100 - 1.2 * 10, 0);
+    const miles = CONFIG.MILES_PER_SECOND * 10;
+    expect(gameState.gas).toBeCloseTo(100 - CONFIG.GAS_PER_MILE * miles, 5);
   });
 
   it('advances time of day', () => {
@@ -273,8 +274,8 @@ describe('tick', () => {
   });
 
   it('triggers game over when gas hits 0', () => {
-    gameState.gas = 2;
-    tick(2); // gas -= 2.4 → below 0
+    gameState.gas = 0.01;
+    tick(1);
     expect(gameState.screen).toBe('gameover');
     expect(gameState.gameoverReason).toContain('gas');
   });
@@ -333,12 +334,12 @@ describe('inflation (purchasing power decay)', () => {
     expect(decay60).toBeLessThan(decay10);
   });
 
-  it('decay rate matches CONFIG.PP_DECAY_PER_TICK', () => {
+  it('decay rate matches miles traveled', () => {
     startPlaying();
-    // exactly 1 tick-worth of dt: dt=1 gives 60 multiplier ticks
     tick(1);
-    const expected = 100 * Math.pow(CONFIG.PP_DECAY_PER_TICK, 60);
-    expect(gameState.purchasingPower).toBeCloseTo(expected, 0);
+    const miles = CONFIG.MILES_PER_SECOND;
+    const expected = 100 * Math.exp(-CONFIG.PP_DECAY_PER_MILE * miles);
+    expect(gameState.purchasingPower).toBeCloseTo(expected, 5);
   });
 });
 
