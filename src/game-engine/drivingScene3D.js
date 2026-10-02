@@ -409,7 +409,7 @@ export class ParallaxScene {
     this._dustData = this.dust.userData.data;
     this.scene.add(this.dust);
 
-    this.rain = makeRain(280);
+    this.rain = makeRain(160);
     this.rain.visible = false;
     this.scene.add(this.rain);
     this._heatColor = new THREE.Color('#e8b56a');
@@ -473,7 +473,7 @@ export class ParallaxScene {
       const on = i === active;
       lm.group.visible = on;
       if (on) {
-        lm.group.position.set(lm.side, lm.baseY, activeRem * 1.25); // negative once passed → behind camera
+        lm.group.position.set(lm.side, lm.baseY, activeRem * 1.25 + (lm.lead || 0));
         if (lm.lava) updateParticleField(lm.lava, dt, true);
         if (lm.smoke) updateParticleField(lm.smoke, dt, true);
       }
@@ -533,7 +533,9 @@ export class ParallaxScene {
     const text = sloganFor(biome);
     if (!this._boardMats) this._boardMats = {};
     if (!this._boardMats[text]) {
-      this._boardMats[text] = new THREE.MeshBasicMaterial({ map: makeWordTexture(text), toneMapped: false });
+      this._boardMats[text] = new THREE.MeshBasicMaterial({
+        map: makeWordTexture(text), toneMapped: false, side: THREE.DoubleSide,
+      });
     }
     return this._boardMats[text];
   }
@@ -552,10 +554,13 @@ export class ParallaxScene {
       grp.add(mesh);
     };
     if (variant === 2) {
-      add(g.billboardLeg, this.matDark, -1.5, 2.2, 0);
-      add(g.billboardLeg, this.matDark, 1.5, 2.2, 0);
-      const panel = new THREE.Mesh(g.billboardPanel, this._boardMat(biome));
-      panel.position.set(0, 4.3, 0);
+      add(g.billboardLeg, this.matDark, -3.1, 3.4, 0);
+      add(g.billboardLeg, this.matDark, 3.1, 3.4, 0);
+      // Plane faces +Z. The camera looks toward +Z, so turn the face around
+      // or the slogan reads backwards.
+      const panel = new THREE.Mesh(new THREE.PlaneGeometry(8.4, 3.6), this._boardMat(biome));
+      panel.position.set(0, 6.2, 0);
+      panel.rotation.y = Math.PI;
       grp.add(panel);
       return grp;
     }
@@ -568,7 +573,7 @@ export class ParallaxScene {
     switch (biome) {
       case 'california': // palms + highway signs; billboards are variant 2
         if (variant === 0) { add(g.palmTrunk, this.matTrunk, 0, 2.6, 0, 0, 0, 0, 1, 1.3, 1); add(g.palmCrown, this.matFoliage, 0, 5.4, 0, 0, 0, 0, 1.3, 1, 1.3); }
-        else { add(g.post, this.matDark, 0, 1.5, 0); add(g.board, this.matSign, 0, 2.9, 0); }
+        else palm();
         break;
       case 'baja': // saguaro + rocky outcrops + scrub
         if (variant === 0) { add(g.saguaro, this.matCactus, 0, 2.6, 0); add(g.saguaroArm, this.matCactus, -0.45, 3, 0, 0, 0, 0.5); add(g.saguaroArm, this.matCactus, 0.45, 2.6, 0, 0, 0, -0.5); add(g.saguaroArm, this.matCactus, -0.45, 3.6, 0, Math.PI / 2, 0, 0); }
@@ -622,10 +627,17 @@ export class ParallaxScene {
         if (idx >= keep) return;
         const variant = idx % 3;
         const prop = this._propMesh(biome, variant);
-        prop.position.set(p.x, terrainHeight(p.x, p.z), p.z);
-        // Billboards face the driver. Everything else can sit at an angle.
-        prop.rotation.y = variant === 2 ? 0 : (idx * 1.7) % (Math.PI * 2);
-        prop.scale.setScalar(variant === 2 ? Math.max(p.s, 3) : p.s);
+        if (variant === 2) {
+          const side = p.x < 0 ? -1 : 1;
+          const x = side * 13;
+          prop.position.set(x, terrainHeight(x, p.z), p.z);
+          prop.rotation.y = 0;
+          prop.scale.setScalar(1.15);
+        } else {
+          prop.position.set(p.x, terrainHeight(p.x, p.z), p.z);
+          prop.rotation.y = (idx * 1.7) % (Math.PI * 2);
+          prop.scale.setScalar(p.s);
+        }
         props.add(prop);
       });
     }
@@ -698,6 +710,15 @@ export class ParallaxScene {
     this._lastScroll = scroll;
     for (const w of this.suv.wheels) w.rotation.x -= dScroll / 0.6;
 
+    // A little suspension so the chase camera feels like a vehicle, and rests when you stop.
+    this._bobT = (this._bobT || 0) + Math.abs(dScroll) * 0.55;
+    const cruise = Math.min(1, Math.abs(dScroll) / (Math.max(dt, 1e-3) * SCROLL * 8));
+    const targetY = 9 + Math.sin(this._bobT) * 0.1 * cruise;
+    const targetX = Math.sin(this._bobT * 0.5) * 0.05 * cruise;
+    const blend = Math.min(1, dt * 8);
+    this.camera.position.y += (targetY - this.camera.position.y) * blend;
+    this.camera.position.x += (targetX - this.camera.position.x) * blend;
+
     // biome environment extras + approaching landmarks
     this._updateEnvironment(dt, s);
     this._updateLandmarks(dt, s);
@@ -724,7 +745,11 @@ export class ParallaxScene {
     this.scene.fog.color.copy(dn.horC);
     if (s.biome === 'sonora') {
       this.scene.fog.color.lerp(this._heatColor, 0.55);
-      if (this.terrainMat.map) this.terrainMat.map.offset.x = (this.terrainMat.map.offset.x + dt * 0.02) % 1;
+      // Shimmer in place. A running offset makes the desert slide sideways.
+      this._heatT = (this._heatT || 0) + dt;
+      if (this.terrainMat.map) this.terrainMat.map.offset.x = Math.sin(this._heatT * 0.8) * 0.015;
+    } else if (this.terrainMat.map) {
+      this.terrainMat.map.offset.x = 0;
     }
     this.renderer.setClearColor(dn.horC);
     this.dome.position.copy(this.camera.position);
@@ -854,39 +879,49 @@ function makeWordTexture(text, opts = {}) {
 
 // Rain sits in front of the fixed SUV. The world scrolls; the streaks do not.
 function makeRain(count) {
-  const pos = new Float32Array(count * 3);
+  const geo = new THREE.PlaneGeometry(0.035, 1.5);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xd5e4ee, transparent: true, opacity: 0.42, depthWrite: false, fog: false, side: THREE.DoubleSide,
+  });
+  const mesh = new THREE.InstancedMesh(geo, mat, count);
+  mesh.frustumCulled = false;
+  const dummy = new THREE.Object3D();
   const data = [];
   for (let i = 0; i < count; i++) {
-    const x = (Math.random() - 0.5) * 36;
-    const y = Math.random() * 26;
-    const z = -6 + Math.random() * 64;
-    data.push({ x, y, z, vy: 16 + Math.random() * 12 });
-    pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z;
+    const drop = {
+      x: (Math.random() - 0.5) * 26,
+      y: Math.random() * 20,
+      z: -2 + Math.random() * 48,
+      vy: 26 + Math.random() * 14,
+    };
+    data.push(drop);
+    dummy.position.set(drop.x, drop.y, drop.z);
+    dummy.rotation.x = 0.25;
+    dummy.updateMatrix();
+    mesh.setMatrixAt(i, dummy.matrix);
   }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  const mat = new THREE.PointsMaterial({
-    color: 0xd5e2ea, size: 0.16, transparent: true, opacity: 0.55, depthWrite: false, fog: false,
-  });
-  const pts = new THREE.Points(geo, mat);
-  pts.userData.data = data;
-  return pts;
+  mesh.userData.data = data;
+  mesh.userData.dummy = dummy;
+  return mesh;
 }
 
 function updateRain(field, dt) {
   const data = field.userData.data;
-  const pos = field.geometry.attributes.position;
+  const dummy = field.userData.dummy;
   for (let i = 0; i < data.length; i++) {
     const d = data[i];
     d.y -= d.vy * dt;
-    if (d.y < 0) {
-      d.y = 18 + Math.random() * 8;
-      d.x = (Math.random() - 0.5) * 36;
-      d.z = -6 + Math.random() * 64;
+    if (d.y < 0.2) {
+      d.y = 14 + Math.random() * 8;
+      d.x = (Math.random() - 0.5) * 26;
+      d.z = -2 + Math.random() * 48;
     }
-    pos.setXYZ(i, d.x, d.y, d.z);
+    dummy.position.set(d.x, d.y, d.z);
+    dummy.rotation.set(0.25, 0, 0);
+    dummy.updateMatrix();
+    field.setMatrixAt(i, dummy.matrix);
   }
-  pos.needsUpdate = true;
+  field.instanceMatrix.needsUpdate = true;
 }
 
 function updateParticleField(field, dt, rise) {
@@ -924,24 +959,24 @@ function buildLandmark(idx) {
   const add = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => {
     const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); group.add(m); return m;
   };
-  let side = 0, baseY = 0, lava = null, smoke = null;
+  let side = 0, baseY = 0, lead = 0, lava = null, smoke = null;
 
   switch (idx) {
-    case 0: { // Los Angeles — one painted Hollywood sign, readable on the approach
-      side = -55; baseY = 0;
-      const hill = M(0x6f5a3a);
-      add(new THREE.BoxGeometry(78, 24, 32), hill, 0, 9, 0, 0.12, 0, 0);
+    case 0: { // Los Angeles — one painted sign on the left hill, whole word in frame
+      side = -48; baseY = 0;
+      const hill = M(0xc4a56a, { r: 1 });
+      add(new THREE.BoxGeometry(34, 10, 14), hill, 0, 4, 0, 0.08, 0, 0);
       const sign = new THREE.Mesh(
-        new THREE.PlaneGeometry(62, 16),
+        new THREE.PlaneGeometry(30, 7.2),
         new THREE.MeshBasicMaterial({
-          map: makeWordTexture('HOLLYWOOD', { bg: '#161311', fg: '#f4f1ea', width: 1024, height: 280 }),
-          toneMapped: false,
+          map: makeWordTexture('HOLLYWOOD', { bg: '#161311', fg: '#f4f1ea', width: 1024, height: 256 }),
+          toneMapped: false, side: THREE.DoubleSide,
         }),
       );
-      sign.position.set(0, 26, 18);
-      sign.rotation.set(-0.12, 0.35, 0);
+      sign.position.set(0, 13, 9);
+      sign.rotation.set(-0.06, Math.PI, 0);
       group.add(sign);
-      group.scale.setScalar(1.85);
+      lead = 95;
       break;
     }
     case 1: { // Tijuana — arch gateway over the road (flag colors)
@@ -981,15 +1016,15 @@ function buildLandmark(idx) {
       break;
     }
     case 5: { // Guatemala City — active volcano with lava glow
-      side = -55; baseY = 0;
-      add(new THREE.ConeGeometry(40, 58, 24), M(0x2a2622), 0, 29, 0);
-      add(new THREE.ConeGeometry(9, 8, 16), M(0xff6a20, { e: 0xff3a00, ei: 2.4 }), 0, 58, 0);
+      side = -42; baseY = 0;
+      add(new THREE.ConeGeometry(36, 52, 24), M(0x3a342c), 0, 26, 0);
+      add(new THREE.ConeGeometry(8, 7, 16), M(0xff6a20, { e: 0xff3a00, ei: 2.4 }), 0, 50, 0);
       lava = makeParticleField(90, 0xffb020, 1.8, true, 0.95);
-      lava.position.set(0, 60, 0);
+      lava.position.set(0, 52, 0);
       group.add(lava);
       smoke = makeParticleField(50, 0x555049, 2.2, false, 0.35);
-      smoke.position.set(0, 64, 0);
-      group.scale.setScalar(1.35);
+      smoke.position.set(0, 56, 0);
+      group.scale.setScalar(1.12);
       group.add(smoke);
       break;
     }
@@ -1014,5 +1049,5 @@ function buildLandmark(idx) {
       break;
     }
   }
-  return { group, side, baseY, lava, smoke };
+  return { group, side, baseY, lead, lava, smoke };
 }

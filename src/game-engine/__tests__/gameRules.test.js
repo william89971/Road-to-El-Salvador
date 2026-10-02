@@ -365,9 +365,9 @@ describe('BTC price random walk', () => {
   });
 
   it('BTC price moves within expected range', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.3); // (0.3 - 0.46) * 1800 ≈ -288
+    vi.spyOn(Math, 'random').mockReturnValue(0.3); // (0.3 - 0.46) * 700 ≈ -112
     tick(2);
-    // price change is capped to max 1800 range, won't exceed 64000+1800
+    // one step of noise plus the mile drift stays under the old 66k guard
     expect(gameState.btcPrice).toBeLessThan(66000);
     expect(gameState.btcPrice).toBeGreaterThan(1000);
     vi.restoreAllMocks();

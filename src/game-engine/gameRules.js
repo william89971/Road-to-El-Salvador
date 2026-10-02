@@ -32,7 +32,7 @@ export function tick(dt) {
   // The stack appreciates with the miles. A small random walk keeps the sparkline alive.
   const drifted = gameState.btcPrice * Math.exp(CONFIG.BTC_DRIFT_PER_MILE * gained);
   if (Math.random() < dt * 0.5) {
-    gameState.btcPrice = Math.max(1000, Math.round(drifted + (Math.random() - 0.46) * 1800));
+    gameState.btcPrice = Math.max(1000, Math.round(drifted + (Math.random() - 0.46) * 700));
     gameState.btcPriceHistory.push(gameState.btcPrice);
     if (gameState.btcPriceHistory.length > 60) gameState.btcPriceHistory.shift();
   } else {
