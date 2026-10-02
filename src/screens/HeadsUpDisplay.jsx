@@ -1,4 +1,7 @@
 import { gameState, CONFIG } from '../game-engine/gameStateAndRules.js';
+import { gallonQuote } from '../game-engine/money.js';
+import { calendarLabel, weatherFor } from '../game-engine/weather.js';
+import { ROUTE } from '../map-data/citiesAndRoute.js';
 import BitcoinPriceSparkline from './BitcoinPriceSparkline.jsx';
 import { FuelIcon, RigIcon, CrewIcon, CashIcon, BtcIcon, PauseIcon, PlayIcon, MuteIcon, MapIcon } from './Icons.jsx';
 
@@ -43,7 +46,7 @@ function Bar({ icon, value, max = 100, color, low }) {
 export default function HeadsUpDisplay({ onToggleMap, onTogglePause, onToggleMute, muted }) {
   const g = gameState;
   const start = startCashFor(g.difficulty);
-  const now = Math.round(g.cash * (g.purchasingPower / 100)); // real purchasing power
+  const now = Math.round(g.cash);
   const ppPct = Math.round(g.purchasingPower);
 
   const btcValue = Math.round(g.btc * g.btcPrice);
@@ -55,6 +58,19 @@ export default function HeadsUpDisplay({ onToggleMap, onTogglePause, onToggleMut
   const VIBES_MAX = 5;
   const vibesLow = g.vibes <= VIBES_MAX * 0.2; // red below 20%, derived from max
 
+  const gallon = gallonQuote(g.purchasingPower, g.btcPrice);
+  const gallonStart = gallonQuote(100, CONFIG.START_BTC_PRICE);
+  // A one-sat dip is noise. Green means the coin has clearly outrun the dollar.
+  const satsCheaper = gallon.sats < gallonStart.sats * 0.9;
+
+  const nextStop = ROUTE.find((stop) => stop.mile > g.miles + 0.5);
+  const gasPerMile = CONFIG.GAS_PER_MILE * (g.pace === 'push' ? CONFIG.PUSH_GAS_MULT : 1);
+  const rangeMi = g.gas / gasPerMile;
+  const gapMi = nextStop ? nextStop.mile - g.miles : 0;
+  const shortOnFuel = Boolean(nextStop) && rangeMi + 1 < gapMi;
+  const nextGallon = nextStop && gapMi <= 40 ? gallonQuote(g.purchasingPower, g.btcPrice) : null;
+  const wx = weatherFor(g.biome, g.timeOfDay, g.days);
+
   return (
     <>
       <style>{`
@@ -63,8 +79,9 @@ export default function HeadsUpDisplay({ onToggleMap, onTogglePause, onToggleMut
           .hud-tr .hud-cols { grid-template-columns: 1fr !important; }
           .hud-tr .hud-title { font-size: 13px !important; }
           .hud-tr .hud-fiat { font-size: 11px !important; }
-          .hud-tl { width: min(150px, 40vw) !important; padding: 8px !important; }
+          .hud-tl { width: min(168px, 46vw) !important; padding: 8px !important; }
           .hud-bottom { width: min(96vw, 640px) !important; }
+          .hud-controls { top: auto !important; bottom: 88px !important; left: 12px !important; transform: none !important; }
         }
       `}</style>
       {/* top-left: vehicle resources */}
@@ -86,6 +103,19 @@ export default function HeadsUpDisplay({ onToggleMap, onTogglePause, onToggleMut
             })}
           </div>
         </div>
+        <div style={{ ...s.rangeLine, color: shortOnFuel ? 'var(--danger)' : '#b6a98c' }}>
+          {shortOnFuel
+            ? `Short ${Math.round(gapMi - rangeMi)} mi to ${nextStop.name}`
+            : `Range ${Math.round(rangeMi)} mi${nextStop ? ` · ${nextStop.name} ${Math.round(gapMi)}` : ''}`}
+        </div>
+        {g.biome === 'sonora' && (
+          <div style={{ ...s.rangeLine, color: '#e8b56a' }}>Sonora heat is in the metal</div>
+        )}
+        {nextGallon && (
+          <div style={{ ...s.rangeLine, color: '#f0c27a' }}>
+            {nextStop.name} gallon ${nextGallon.dollars.toLocaleString()} · {nextGallon.sats.toLocaleString()} sats
+          </div>
+        )}
       </div>
 
       {/* top-right: HARD MONEY widget */}
@@ -122,15 +152,26 @@ export default function HeadsUpDisplay({ onToggleMap, onTogglePause, onToggleMut
         <div style={s.spark}>
           <BitcoinPriceSparkline data={g.btcPriceHistory} width={188} height={34} />
         </div>
+        <div style={{ ...s.gallon, color: satsCheaper ? '#5ec27a' : '#d8c7a6' }}>
+          Gallon ${gallon.dollars.toLocaleString()} · {gallon.sats.toLocaleString()} sats
+        </div>
       </div>
 
       {/* top-center controls */}
-      <div style={s.controls}>
+      <div style={s.controls} className="hud-controls">
         <button style={s.ctrlBtn} onClick={onTogglePause} title="Pause" aria-label="Pause">
           {g.paused ? <PlayIcon size={16} /> : <PauseIcon size={16} />}
         </button>
         <button style={s.ctrlBtn} onClick={onToggleMute} title="Sound" aria-label="Sound">
           <MuteIcon size={16} muted={muted} />
+        </button>
+        <button
+          style={{ ...s.ctrlBtn, color: g.pace === 'push' ? 'var(--btc)' : 'var(--paper)' }}
+          onClick={() => { gameState.pace = g.pace === 'push' ? 'cruise' : 'push'; }}
+          title="Cruise or push"
+          aria-label="Cruise or push"
+        >
+          {g.pace === 'push' ? 'PUSH' : 'CRUISE'}
         </button>
       </div>
 
@@ -148,7 +189,7 @@ export default function HeadsUpDisplay({ onToggleMap, onTogglePause, onToggleMut
           <span style={s.progEnd}>🇸🇻</span>
         </div>
         <div style={s.progLabel}>
-          {Math.round(g.miles)} / {CONFIG.TOTAL_MILES} mi · {g.currentCity} · Day {g.days}
+          {Math.round(g.miles)} / {CONFIG.TOTAL_MILES} mi · {g.currentCity} · {calendarLabel(g.days)} · {wx.label}
         </div>
       </div>
     </>
@@ -165,7 +206,7 @@ const panel = {
 };
 
 const s = {
-  tl: { ...panel, position: 'fixed', top: 12, left: 12, zIndex: 10, padding: '10px 12px', width: 190, display: 'flex', flexDirection: 'column', gap: 7 },
+  tl: { ...panel, position: 'fixed', top: 12, left: 12, zIndex: 10, padding: '10px 12px', width: 220, display: 'flex', flexDirection: 'column', gap: 7 },
   barRow: { display: 'flex', alignItems: 'center', gap: 7 },
   barIcon: { width: 18, display: 'flex', justifyContent: 'center', alignItems: 'center' },
   barTrack: { flex: 1, height: 9, background: 'rgba(0,0,0,0.5)', borderRadius: 5, overflow: 'hidden' },
@@ -173,6 +214,7 @@ const s = {
   barNum: { width: 26, textAlign: 'right', fontSize: 12, fontWeight: 700 },
   vibesRow: { display: 'flex', alignItems: 'center', gap: 7 },
   vibes: { display: 'flex', gap: 2, flex: 1, alignItems: 'center' },
+  rangeLine: { fontSize: 10.5, lineHeight: 1.3, letterSpacing: '0.01em' },
 
   tr: { ...panel, position: 'fixed', top: 12, right: 12, zIndex: 10, padding: '10px 12px', width: 234 },
   widgetTitle: { fontFamily: 'var(--font-title)', fontSize: 15, letterSpacing: '0.14em', color: 'var(--btc)', textAlign: 'center', marginBottom: 6 },
@@ -187,6 +229,7 @@ const s = {
   ppFill: { height: '100%', background: 'var(--danger)', transition: 'width 0.3s linear' },
   sub: { fontSize: 10.5, color: '#b6a98c' },
   spark: { marginTop: 7, borderTop: '1px solid rgba(245,230,202,0.12)', paddingTop: 5 },
+  gallon: { marginTop: 4, fontSize: 11, textAlign: 'center', letterSpacing: '0.02em' },
 
   controls: { position: 'fixed', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 10, display: 'flex', gap: 8 },
   ctrlBtn: { ...panel, padding: '7px 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--paper)', cursor: 'pointer' },

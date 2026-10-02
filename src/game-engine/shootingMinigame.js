@@ -234,6 +234,15 @@ export class WaveShooter {
     this.onComplete({ outcome, defeated: this.defeated });
   }
 
+  // Stop the loop without treating it as a player choice. Used when the
+  // screen unmounts mid-fight (including React re-running the effect).
+  destroy() {
+    if (this.done) return;
+    this.done = true;
+    cancelAnimationFrame(this._raf);
+    this.dispose();
+  }
+
   dispose() {
     this.canvas.removeEventListener('pointerdown', this._onPointer);
     window.removeEventListener('keydown', this._onKey);

@@ -15,19 +15,40 @@ export function applyEffects(e) {
 // call once per animation frame with delta seconds
 export function tick(dt) {
   if (gameState.paused || gameState.screen !== 'playing') return;
-  gameState.miles = clamp(gameState.miles + CONFIG.MILES_PER_SECOND * dt, 0, CONFIG.TOTAL_MILES);
-  gameState.gas = clamp(gameState.gas - 1.2 * dt, 0, 100);
+  const pushing = gameState.pace === 'push';
+  const mps = pushing ? CONFIG.PUSH_MILES_PER_SECOND : CONFIG.MILES_PER_SECOND;
+  const gasPerMile = CONFIG.GAS_PER_MILE * (pushing ? CONFIG.PUSH_GAS_MULT : 1);
+  const before = gameState.miles;
+  gameState.miles = clamp(before + mps * dt, 0, CONFIG.TOTAL_MILES);
+  const gained = gameState.miles - before;
+  gameState.gas = clamp(gameState.gas - gasPerMile * gained, 0, 100);
+  const heat = gameState.biome === 'sonora' ? CONFIG.SONORA_HEAT_PER_MILE : 0;
+  gameState.suvHealth = clamp(gameState.suvHealth - (CONFIG.SUV_WEAR_PER_MILE + heat) * gained, 0, 100);
   gameState.timeOfDay = (gameState.timeOfDay + dt / 120) % 1; // 2-min day
   gameState.days = Math.floor(gameState.miles / 40);
   gameState.purchasingPower = clamp(
-    gameState.purchasingPower * Math.pow(CONFIG.PP_DECAY_PER_TICK, dt * 60),
+    gameState.purchasingPower * Math.exp(-CONFIG.PP_DECAY_PER_MILE * gained),
     1,
     100,
   );
 
-  // BTC random walk, upward drift, ~once per simulated day
-  if (Math.random() < dt * 0.5) {
-    gameState.btcPrice = Math.max(1000, Math.round(gameState.btcPrice + (Math.random() - 0.46) * 1800));
+  // The stack appreciates with the miles. The number the player reads steps,
+  // so a 60fps drive does not spin the gallon price like a slot machine.
+  // A fresh run, a save, or a test writes btcPrice. Follow that, and keep the
+  // unrounded walk only while the printed number is still the one we published.
+  if (gameState.btcExact == null || gameState.btcPrice !== gameState.btcPrinted) {
+    gameState.btcExact = gameState.btcPrice;
+    gameState.btcPrinted = gameState.btcPrice;
+  }
+  gameState.btcExact *= Math.exp(CONFIG.BTC_DRIFT_PER_MILE * gained);
+  const walked = Math.random() < dt * 0.5;
+  if (walked) {
+    gameState.btcExact = Math.max(1000, gameState.btcExact + (Math.random() - 0.46) * 700);
+  }
+  const shown = Math.max(1000, Math.round(gameState.btcExact));
+  if (Math.abs(shown - gameState.btcPrice) >= 250) {
+    gameState.btcPrice = shown;
+    gameState.btcPrinted = shown;
     gameState.btcPriceHistory.push(gameState.btcPrice);
     if (gameState.btcPriceHistory.length > 60) gameState.btcPriceHistory.shift();
   }

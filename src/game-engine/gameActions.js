@@ -61,7 +61,7 @@ export function incrementEnemiesDefeated() {
 export function rememberEventTitle(title) {
   if (!title) return;
   gameState.recentEventTitles.push(title);
-  if (gameState.recentEventTitles.length > 3) gameState.recentEventTitles.shift();
+  if (gameState.recentEventTitles.length > 8) gameState.recentEventTitles.shift();
 }
 
 export function setPurchasingPower(pp) {
@@ -74,4 +74,8 @@ export function adjustPurchasingPower(delta) {
 
 export function adjustBTC(delta) {
   gameState.btc = clamp(gameState.btc + delta, 0, 99);
+}
+
+export function spendBtc(amount) {
+  gameState.btc = clamp(gameState.btc - amount, 0, 99);
 }

@@ -9,6 +9,8 @@ export const gameState = {
   suvColor: '#7a8c6e',        // chosen SUV paint
   loadoutId: 'road_warrior',  // chosen starting loadout
   startCash: 800,             // cash at the start of this run (for the HUD baseline)
+  startBtc: 0.05,             // stack at the start of this run (for the scorecard)
+  cityStopIndex: -1,          // -1 = on the road; >= 0 = shop open at that stop
 
   miles: 0,
   days: 0,
@@ -24,6 +26,8 @@ export const gameState = {
   btc: 0.05,
 
   btcPrice: 64000,
+  btcExact: 64000,          // unrounded walk; the HUD prints btcPrice in steps
+  btcPrinted: 64000,        // last price this walk published
   btcPriceHistory: [64000], // last 60 values, for sparkline
   purchasingPower: 100,     // 100 -> shrinks toward 1
 
@@ -32,6 +36,8 @@ export const gameState = {
   enemiesDefeated: 0,
   eventsSurvived: 0,
   gameoverReason: '',
+  paidLastGallonInSats: false,
+  pace: 'cruise',      // 'cruise' | 'push'
 };
 
 export function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -45,10 +51,13 @@ export function resetGame(name, difficulty, loadout, suvColor = '#7a8c6e') {
     miles: 0, days: 0, currentCity: 'Los Angeles', currentCountry: 'USA',
     biome: 'california', timeOfDay: 0.35,
     gas: lo.gas, suvHealth: 100, vibes: 5,
-    cash, startCash: cash, btc: lo.btc,
-    btcPrice: CONFIG.START_BTC_PRICE, btcPriceHistory: [CONFIG.START_BTC_PRICE],
-    purchasingPower: 100, recentEventTitles: [], lastStopIndex: -1,
+    cash, startCash: cash, btc: lo.btc, startBtc: lo.btc,
+    btcPrice: CONFIG.START_BTC_PRICE, btcExact: CONFIG.START_BTC_PRICE, btcPrinted: CONFIG.START_BTC_PRICE,
+    btcPriceHistory: [CONFIG.START_BTC_PRICE],
+    purchasingPower: 100, recentEventTitles: [], lastStopIndex: -1, cityStopIndex: -1,
     enemiesDefeated: 0, eventsSurvived: 0, gameoverReason: '',
+    paidLastGallonInSats: false,
+    pace: 'cruise',
   });
 }
 

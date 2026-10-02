@@ -66,9 +66,10 @@ describe.sequential('createGameLoop', () => {
   it('resets the event timer', () => {
     const onEventFire = vi.fn();
     loop = createGameLoop({ scene: mockScene, onEventFire, onCityStop: vi.fn() });
+    gameState.lastStopIndex = 99; // don't let a city stop pause the clock
     loop.resetEventTimer();
-    // After reset, it should take up to 90s again.
-    for (let i = 0; i < 50; i++) loop.tickOnce(1);
+    const steps = Math.floor(CONFIG.EVENT_MIN_MS / 1000) - 1;
+    for (let i = 0; i < steps; i++) loop.tickOnce(1);
     expect(onEventFire).not.toHaveBeenCalled();
   });
 });

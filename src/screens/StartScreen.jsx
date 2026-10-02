@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { createSUV } from '../game-engine/truckModel3D.js';
 import { LOADOUTS } from '../game-engine/gameStateAndRules.js';
+import { loadCheckpoint } from '../game-engine/runSave.js';
 import { CashIcon, BtcIcon, FuelIcon } from './Icons.jsx';
 
 const DIFFICULTIES = [
@@ -29,7 +30,13 @@ function SuvPreview({ color }) {
   useEffect(() => {
     const canvas = canvasRef.current;
     const w = canvas.clientWidth || 220, h = canvas.clientHeight || 150;
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    let renderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    } catch (err) {
+      console.warn('SUV preview unavailable:', err);
+      return;
+    }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(w, h, false);
 
@@ -82,7 +89,8 @@ function StatBar({ label, value, pct, color }) {
   );
 }
 
-export default function StartScreen({ onStart, onShowLeaderboard }) {
+export default function StartScreen({ onStart, onContinue, onShowLeaderboard }) {
+  const [checkpoint] = useState(() => loadCheckpoint());
   const [name, setName] = useState('');
   const [difficulty, setDifficulty] = useState('road_warrior');
   const [suvColor, setSuvColor] = useState('#7a8c6e');
@@ -200,12 +208,18 @@ export default function StartScreen({ onStart, onShowLeaderboard }) {
 
         <button style={styles.start} onClick={start}>START THE ENGINE ▸</button>
 
+        {checkpoint && onContinue && (
+          <button style={styles.cont} onClick={onContinue}>
+            CONTINUE FROM {checkpoint.currentCity || 'THE ROAD'}
+          </button>
+        )}
+
         {onShowLeaderboard && (
           <button style={styles.lbBtn} onClick={onShowLeaderboard}>🏆 Leaderboard</button>
         )}
 
         <div style={styles.hint}>
-          2,800 miles · 8 stops · newspaper events · wave-shooter ambushes
+          2,800 miles · a full tank will not cover every gap · refuel before the long legs
         </div>
       </div>
     </div>
@@ -257,6 +271,10 @@ const styles = {
   start: {
     width: '100%', marginTop: 20, padding: '15px', fontSize: 26, borderRadius: 12,
     background: 'var(--btc)', color: '#1a1411', boxShadow: '0 8px 24px rgba(247,147,26,0.35)',
+  },
+  cont: {
+    width: '100%', marginTop: 10, padding: '12px', fontSize: 18, borderRadius: 10,
+    background: 'transparent', color: 'var(--btc)', border: '1px solid var(--btc)',
   },
   lbBtn: {
     width: '100%', marginTop: 10, padding: '11px', fontSize: 18, borderRadius: 10,

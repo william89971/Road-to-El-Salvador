@@ -60,8 +60,8 @@ The API key lives **only on the server**. The client calls `/api/event`; the ser
 ## How to play
 
 - **Start:** pick a driver name and difficulty (Tourist / Road Warrior / Satoshi).
-- **Drive:** the SUV travels automatically. Watch gas, SUV health, and crew vibes — hit zero on
-  any and the run ends.
+- **Drive:** the SUV travels automatically. The fuel line shows your range against the next city —
+  a full tank will not cover every gap. Hit zero gas, SUV health, or vibes and the run ends.
 - **Hard money:** the top-right widget is the heart of the game. Your **cash** loses purchasing
   power over time (the red bar shrinks); your **BTC stack** rides a rising random walk. Reaching
   El Salvador with a bigger real stack than you started with is the goal.
@@ -124,8 +124,8 @@ src/
 ## Tech notes
 
 - One Three.js/WebGL context (the parallax driving scene); the wave-shooter is a separate 2D canvas.
-- The leaderboard is backend-first (`/api/runs`); it falls back to an in-memory buffer if the server
-  is unreachable. No `localStorage`/`sessionStorage` is used.
+- The leaderboard is backend-first (`/api/runs`). If the server is unreachable it saves in
+  `localStorage`, and falls back to memory if storage is blocked.
 - The Anthropic API key never ships to the browser.
 - CI runs `npm run lint`, `npm test`, and `npm run build` on every PR.
 - See `BUILD_SPEC.md` for the original design contract and `TASKLIST.md` for the verifiable backlog.

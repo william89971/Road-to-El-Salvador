@@ -55,7 +55,9 @@ export function createGameLoop({ scene, onEventFire, onCityStop, onArrival, onAu
   }
 
   function step(now) {
-    const dt = Math.min(0.05, (now - last) / 1000);
+    // Catch slow frames so the trip stays about six minutes. Cap a hitch so a
+    // backgrounded tab does not skip a city when it wakes up.
+    const dt = Math.min(0.2, (now - last) / 1000);
     last = now;
     update(dt);
     raf = requestAnimationFrame(step);

@@ -1,7 +1,10 @@
+import { useEffect } from 'react';
 import { gameState, CONFIG } from '../game-engine/gameStateAndRules.js';
+import { clearCheckpoint } from '../game-engine/runSave.js';
 
 export default function GameOverScreen({ onRestart, onMenu }) {
   const g = gameState;
+  useEffect(() => { clearCheckpoint(); }, []);
   const btcValue = Math.round(g.btc * g.btcPrice);
   const pct = Math.round((g.miles / CONFIG.TOTAL_MILES) * 100);
 

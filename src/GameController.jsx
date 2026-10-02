@@ -23,6 +23,7 @@ import {
 } from './game-engine/gameActions.js';
 import { createGameLoop } from './game-engine/gameLoop.js';
 import { saveRun } from './game-engine/leaderboardStorage.js';
+import { saveCheckpoint, loadCheckpoint, clearCheckpoint, restoreCheckpoint } from './game-engine/runSave.js';
 
 export default function GameController() {
   const canvasRef = useRef(null);
@@ -37,6 +38,7 @@ export default function GameController() {
   const [nameBanner, setNameBanner] = useState(null); // ROUTE stop shown as a cinematic banner
   const [webglError, setWebglError] = useState(false);
   const bannerTimerRef = useRef(null);
+  const pendingStopRef = useRef(null);
   const loopRef = useRef(null);
 
   // audio reaction bookkeeping
@@ -59,13 +61,15 @@ export default function GameController() {
       scene,
       onEventFire: fireEvent,
       onCityStop: (stop, index) => {
+        pendingStopRef.current = index;
         setNameBanner(stop);
         clearTimeout(bannerTimerRef.current);
         bannerTimerRef.current = setTimeout(() => {
+          if (pendingStopRef.current !== index) return;
+          pendingStopRef.current = null;
           setNameBanner(null);
-          setCurrentStop(index);
-          forceRender();
-        }, 3000);
+          openCity(index);
+        }, 2600);
       },
       onAudioReact: reactAudio,
     });
@@ -144,17 +148,53 @@ export default function GameController() {
     audioRef.current = { histLen: 1, btc: CONFIG.START_BTC_PRICE, gasAlarm: false, suvAlarm: false, engine: audioRef.current.engine };
   };
 
+  const openCity = (index) => {
+    setCurrentStop(index);
+    saveCheckpoint();
+    forceRender();
+  };
+
   const handleStart = (name, difficulty, loadout, suvColor) => {
     audio.init();
+    clearCheckpoint();
     resetGame(name, difficulty, loadout, suvColor);
     setLastStopIndex(0); // already at LA (index 0)
     clearStop();
     eventDataRef.current = null;
     setEventData(null);
     clearTimeout(bannerTimerRef.current);
+    pendingStopRef.current = null;
     setNameBanner(null);
     loopRef.current?.resetEventTimer();
     resetAudioBookkeeping();
+    forceRender();
+  };
+
+  const skipBanner = () => {
+    const index = pendingStopRef.current;
+    if (index == null) return;
+    pendingStopRef.current = null;
+    clearTimeout(bannerTimerRef.current);
+    setNameBanner(null);
+    openCity(index);
+  };
+
+  const handleContinue = () => {
+    const snap = loadCheckpoint();
+    if (!snap) return;
+    audio.init();
+    restoreCheckpoint(snap);
+    eventDataRef.current = null;
+    setEventData(null);
+    setShooter(null);
+    clearTimeout(bannerTimerRef.current);
+    pendingStopRef.current = null;
+    setNameBanner(null);
+    loopRef.current?.resetEventTimer();
+    if (gameState.cityStopIndex >= 0) setPaused(true);
+    resetAudioBookkeeping();
+    audioRef.current.histLen = gameState.btcPriceHistory.length;
+    audioRef.current.btc = gameState.btcPrice;
     forceRender();
   };
 
@@ -166,17 +206,52 @@ export default function GameController() {
       setShooter({ source: 'stop' }); // stays paused until the shooter resolves
     } else {
       setPaused(false);
+      saveCheckpoint();
     }
     forceRender();
   };
 
   const endShooter = () => {
+    const fromStop = shooter?.source === 'stop';
     // a "Stand your ground" event only counts as survived once the ambush resolves
     if (shooter?.source === 'event') incrementEventsSurvived();
     setShooter(null);
     setPaused(false);
+    if (fromStop) saveCheckpoint();
     forceRender();
   };
+
+  const keyRef = useRef(null);
+  keyRef.current = (e) => {
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+    if (gameState.screen !== 'playing') return;
+    if (e.code === 'Space') {
+      if (gameState.cityStopIndex >= 0 || eventDataRef.current || shooter) return;
+      e.preventDefault();
+      togglePausedAction();
+      forceRender();
+    } else if (e.key === 'm' || e.key === 'M') {
+      setShowMap((v) => !v);
+    } else if (e.key === 'Escape') {
+      if (showMap) setShowMap(false);
+      else if (gameState.paused && gameState.cityStopIndex < 0 && !eventDataRef.current && !shooter && !nameBanner) {
+        togglePausedAction();
+        forceRender();
+      }
+    } else if (e.key === 'ArrowUp') {
+      gameState.pace = 'push';
+      forceRender();
+    } else if (e.key === 'ArrowDown') {
+      gameState.pace = 'cruise';
+      forceRender();
+    }
+  };
+
+  useEffect(() => {
+    const onKey = (e) => keyRef.current?.(e);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const togglePause = () => { togglePausedAction(); forceRender(); };
   const toggleMap = () => { setShowMap((v) => !v); };
@@ -187,6 +262,7 @@ export default function GameController() {
   };
 
   const restart = () => {
+    clearCheckpoint();
     resetGame(gameState.playerName, gameState.difficulty, LOADOUTS[gameState.loadoutId], gameState.suvColor);
     setLastStopIndex(0);
     clearStop();
@@ -194,6 +270,7 @@ export default function GameController() {
     setEventData(null);
     setShooter(null);
     clearTimeout(bannerTimerRef.current);
+    pendingStopRef.current = null;
     setNameBanner(null);
     loopRef.current?.resetEventTimer();
     resetAudioBookkeeping();
@@ -205,6 +282,7 @@ export default function GameController() {
     eventDataRef.current = null;
     setEventData(null);
     clearTimeout(bannerTimerRef.current);
+    pendingStopRef.current = null;
     setNameBanner(null);
     forceRender();
   };
@@ -234,7 +312,7 @@ export default function GameController() {
       <canvas ref={canvasRef} style={styles.canvas} />
 
       {s.screen === 'start' && (
-        <StartScreen onStart={handleStart} onShowLeaderboard={() => setShowLeaderboard(true)} />
+        <StartScreen onStart={handleStart} onContinue={handleContinue} onShowLeaderboard={() => setShowLeaderboard(true)} />
       )}
 
       {s.screen === 'playing' && (
@@ -250,12 +328,11 @@ export default function GameController() {
             <ShootingMinigameScreen biome={gameState.biome} onDone={endShooter} />
           )}
           {showMap && <RouteMapScreen onClose={() => setShowMap(false)} />}
-          {nameBanner && <NameBanner stop={nameBanner} />}
+          {nameBanner && <NameBanner stop={nameBanner} onSkip={skipBanner} />}
           {s.paused && s.cityStopIndex < 0 && !eventData && !nameBanner && (
-            <div style={styles.pauseOverlay} onClick={togglePause}>
-              <div style={{ fontFamily: 'var(--font-title)', fontSize: 48 }}>PAUSED</div>
-              <div style={{ fontFamily: 'var(--font-num)', fontSize: 14, opacity: 0.8 }}>click to resume</div>
-            </div>
+            <button style={styles.pauseChip} onClick={togglePause}>
+              Paused · click or Space
+            </button>
           )}
         </>
       )}
@@ -263,7 +340,7 @@ export default function GameController() {
       {s.screen === 'gameover' && <GameOverScreen onRestart={restart} onMenu={toMenu} />}
 
       {s.screen === 'arrival' && (
-        <ArrivalCinematic onDone={() => { setScreen('victory'); saveRun(); forceRender(); }} />
+        <ArrivalCinematic onDone={() => { clearCheckpoint(); setScreen('victory'); saveRun(); forceRender(); }} />
       )}
 
       {s.screen === 'victory' && (
@@ -277,9 +354,12 @@ export default function GameController() {
 
 const styles = {
   canvas: { position: 'fixed', inset: 0, width: '100vw', height: '100vh', zIndex: 0 },
-  pauseOverlay: {
-    position: 'fixed', inset: 0, zIndex: 40, display: 'grid', placeItems: 'center',
-    background: 'rgba(26,20,17,0.6)', color: 'var(--paper)', cursor: 'pointer', textAlign: 'center',
+  pauseChip: {
+    position: 'fixed', top: 64, left: '50%', transform: 'translateX(-50%)', zIndex: 40,
+    padding: '8px 16px', borderRadius: 999, cursor: 'pointer',
+    background: 'rgba(20,15,12,0.82)', color: 'var(--paper)',
+    border: '1px solid rgba(247,147,26,0.45)',
+    fontFamily: 'var(--font-num)', fontSize: 14, letterSpacing: '0.04em',
   },
   fallbackWrap: {
     position: 'fixed', inset: 0, display: 'grid', placeItems: 'center',

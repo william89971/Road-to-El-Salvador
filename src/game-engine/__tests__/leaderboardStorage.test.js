@@ -2,7 +2,7 @@
 // When the backend is unreachable, topRuns() reads the in-memory buffer,
 // returns runs sorted by btcValue descending, and respects the n limit.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { topRuns, saveRun, __resetFallbackRuns } from '../leaderboardStorage.js';
+import { topRuns, saveRun, __resetFallbackRuns, __clearMemoryRuns } from '../leaderboardStorage.js';
 import { gameState } from '../gameState.js';
 
 describe('topRuns in-memory fallback', () => {
@@ -34,6 +34,22 @@ describe('topRuns in-memory fallback', () => {
 
     const runs = await topRuns(2);
     expect(runs.map((r) => r.btcValue)).toEqual([300, 200]);
+  });
+
+  it('reloads saved runs from localStorage after the memory buffer is cleared', async () => {
+    const store = new Map();
+    vi.stubGlobal('localStorage', {
+      getItem: (k) => (store.has(k) ? store.get(k) : null),
+      setItem: (k, v) => store.set(k, String(v)),
+      removeItem: (k) => store.delete(k),
+    });
+    __resetFallbackRuns();
+    gameState.btc = 0.04;
+    gameState.btcPrice = 10000;
+    await saveRun();
+    __clearMemoryRuns();
+    const runs = await topRuns();
+    expect(runs.map((r) => r.btcValue)).toEqual([400]);
   });
 
   it('ignores entries from other test runs by relying on module-level buffer', async () => {

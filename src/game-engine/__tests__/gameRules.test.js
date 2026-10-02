@@ -3,6 +3,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { tick, applyEffects } from '../gameRules.js';
 import { gameState, resetGame, clamp, endGame } from '../gameState.js';
 import { CONFIG } from '../gameConfig.js';
+import { gallonQuote } from '../money.js';
+import { ROUTE } from '../../map-data/citiesAndRoute.js';
 
 // helper: reset state to a known playing state before each test
 function startPlaying(overrides = {}) {
@@ -19,6 +21,8 @@ function startPlaying(overrides = {}) {
     cash: 800,
     btc: 0.05,
     btcPrice: 64000,
+    btcExact: 64000,
+    btcPrinted: 64000,
     btcPriceHistory: [64000],
     purchasingPower: 100,
     gameoverReason: '',
@@ -26,6 +30,7 @@ function startPlaying(overrides = {}) {
     biome: 'california',
     currentCity: 'Los Angeles',
     currentCountry: 'USA',
+    pace: 'cruise',
     recentEventTitles: [],
     lastStopIndex: -1,
     enemiesDefeated: 0,
@@ -231,9 +236,10 @@ describe('tick', () => {
     expect(gameState.miles).toBeCloseTo(CONFIG.MILES_PER_SECOND * 2, 0);
   });
 
-  it('consumes gas based on dt', () => {
+  it('consumes gas based on miles traveled', () => {
     tick(10);
-    expect(gameState.gas).toBeCloseTo(100 - 1.2 * 10, 0);
+    const miles = CONFIG.MILES_PER_SECOND * 10;
+    expect(gameState.gas).toBeCloseTo(100 - CONFIG.GAS_PER_MILE * miles, 5);
   });
 
   it('advances time of day', () => {
@@ -273,8 +279,8 @@ describe('tick', () => {
   });
 
   it('triggers game over when gas hits 0', () => {
-    gameState.gas = 2;
-    tick(2); // gas -= 2.4 → below 0
+    gameState.gas = 0.01;
+    tick(1);
     expect(gameState.screen).toBe('gameover');
     expect(gameState.gameoverReason).toContain('gas');
   });
@@ -333,12 +339,12 @@ describe('inflation (purchasing power decay)', () => {
     expect(decay60).toBeLessThan(decay10);
   });
 
-  it('decay rate matches CONFIG.PP_DECAY_PER_TICK', () => {
+  it('decay rate matches miles traveled', () => {
     startPlaying();
-    // exactly 1 tick-worth of dt: dt=1 gives 60 multiplier ticks
     tick(1);
-    const expected = 100 * Math.pow(CONFIG.PP_DECAY_PER_TICK, 60);
-    expect(gameState.purchasingPower).toBeCloseTo(expected, 0);
+    const miles = CONFIG.MILES_PER_SECOND;
+    const expected = 100 * Math.exp(-CONFIG.PP_DECAY_PER_MILE * miles);
+    expect(gameState.purchasingPower).toBeCloseTo(expected, 5);
   });
 });
 
@@ -361,12 +367,81 @@ describe('BTC price random walk', () => {
     vi.restoreAllMocks();
   });
 
+  it('holds the printed price still across a few frames', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const printed = gameState.btcPrice;
+    tick(1 / 60);
+    tick(1 / 60);
+    tick(1 / 60);
+    expect(gameState.btcPrice).toBe(printed);
+    vi.restoreAllMocks();
+  });
+
   it('BTC price moves within expected range', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.3); // (0.3 - 0.46) * 1800 ≈ -288
+    vi.spyOn(Math, 'random').mockReturnValue(0.3); // (0.3 - 0.46) * 700 ≈ -112
     tick(2);
-    // price change is capped to max 1800 range, won't exceed 64000+1800
+    // one step of noise plus the mile drift stays under the old 66k guard
     expect(gameState.btcPrice).toBeLessThan(66000);
     expect(gameState.btcPrice).toBeGreaterThan(1000);
+    vi.restoreAllMocks();
+  });
+});
+
+describe('pace', () => {
+  it('push burns more gas than cruise over the same distance', () => {
+    startPlaying({ pace: 'cruise', gas: 100, miles: 0 });
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    tick(100 / CONFIG.MILES_PER_SECOND);
+    const cruiseGas = gameState.gas;
+    vi.restoreAllMocks();
+
+    startPlaying({ pace: 'push', gas: 100, miles: 0 });
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    tick(100 / CONFIG.PUSH_MILES_PER_SECOND);
+    const pushGas = gameState.gas;
+    vi.restoreAllMocks();
+
+    expect(gameState.miles).toBeGreaterThanOrEqual(99);
+    expect(pushGas).toBeLessThan(cruiseGas);
+    expect(cruiseGas).toBeCloseTo(100 - CONFIG.GAS_PER_MILE * 100, 4);
+  });
+});
+
+describe('Sonora heat', () => {
+  const desertMiles = 780; // Hermosillo → Mexico City
+
+  function drive(biome) {
+    startPlaying({ biome, suvHealth: 100, gas: 100, miles: 0 });
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    tick(desertMiles / CONFIG.MILES_PER_SECOND);
+    vi.restoreAllMocks();
+    return gameState.suvHealth;
+  }
+
+  it('wears the truck faster than California over the same distance', () => {
+    const california = drive('california');
+    const sonora = drive('sonora');
+    expect(sonora).toBeLessThan(california);
+  });
+
+  it('does not stop a full-health truck from finishing the desert leg', () => {
+    const health = drive('sonora');
+    expect(health).toBeGreaterThan(0);
+    expect(gameState.screen).toBe('playing');
+    expect(gameState.miles).toBeGreaterThanOrEqual(desertMiles - 0.05);
+  });
+});
+
+describe('the gallon by Guatemala', () => {
+  it('costs more dollars and fewer sats than it did in Los Angeles', () => {
+    startPlaying();
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const start = gallonQuote(100, CONFIG.START_BTC_PRICE);
+    const guatemala = ROUTE.find((c) => c.name === 'Guatemala City');
+    tick(guatemala.mile / CONFIG.MILES_PER_SECOND);
+    const now = gallonQuote(gameState.purchasingPower, gameState.btcPrice);
+    expect(now.dollars).toBeGreaterThan(start.dollars);
+    expect(now.sats).toBeLessThan(start.sats);
     vi.restoreAllMocks();
   });
 });
