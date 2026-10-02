@@ -221,6 +221,38 @@ export default function GameController() {
     forceRender();
   };
 
+  const keyRef = useRef(null);
+  keyRef.current = (e) => {
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+    if (gameState.screen !== 'playing') return;
+    if (e.code === 'Space') {
+      if (gameState.cityStopIndex >= 0 || eventDataRef.current || shooter) return;
+      e.preventDefault();
+      togglePausedAction();
+      forceRender();
+    } else if (e.key === 'm' || e.key === 'M') {
+      setShowMap((v) => !v);
+    } else if (e.key === 'Escape') {
+      if (showMap) setShowMap(false);
+      else if (gameState.paused && gameState.cityStopIndex < 0 && !eventDataRef.current && !shooter && !nameBanner) {
+        togglePausedAction();
+        forceRender();
+      }
+    } else if (e.key === 'ArrowUp') {
+      gameState.pace = 'push';
+      forceRender();
+    } else if (e.key === 'ArrowDown') {
+      gameState.pace = 'cruise';
+      forceRender();
+    }
+  };
+
+  useEffect(() => {
+    const onKey = (e) => keyRef.current?.(e);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const togglePause = () => { togglePausedAction(); forceRender(); };
   const toggleMap = () => { setShowMap((v) => !v); };
   const toggleMute = () => {
@@ -298,10 +330,9 @@ export default function GameController() {
           {showMap && <RouteMapScreen onClose={() => setShowMap(false)} />}
           {nameBanner && <NameBanner stop={nameBanner} onSkip={skipBanner} />}
           {s.paused && s.cityStopIndex < 0 && !eventData && !nameBanner && (
-            <div style={styles.pauseOverlay} onClick={togglePause}>
-              <div style={{ fontFamily: 'var(--font-title)', fontSize: 48 }}>PAUSED</div>
-              <div style={{ fontFamily: 'var(--font-num)', fontSize: 14, opacity: 0.8 }}>click to resume</div>
-            </div>
+            <button style={styles.pauseChip} onClick={togglePause}>
+              Paused · click or Space
+            </button>
           )}
         </>
       )}
@@ -323,9 +354,12 @@ export default function GameController() {
 
 const styles = {
   canvas: { position: 'fixed', inset: 0, width: '100vw', height: '100vh', zIndex: 0 },
-  pauseOverlay: {
-    position: 'fixed', inset: 0, zIndex: 40, display: 'grid', placeItems: 'center',
-    background: 'rgba(26,20,17,0.6)', color: 'var(--paper)', cursor: 'pointer', textAlign: 'center',
+  pauseChip: {
+    position: 'fixed', top: 64, left: '50%', transform: 'translateX(-50%)', zIndex: 40,
+    padding: '8px 16px', borderRadius: 999, cursor: 'pointer',
+    background: 'rgba(20,15,12,0.82)', color: 'var(--paper)',
+    border: '1px solid rgba(247,147,26,0.45)',
+    fontFamily: 'var(--font-num)', fontSize: 14, letterSpacing: '0.04em',
   },
   fallbackWrap: {
     position: 'fixed', inset: 0, display: 'grid', placeItems: 'center',

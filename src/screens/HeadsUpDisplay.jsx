@@ -45,7 +45,7 @@ function Bar({ icon, value, max = 100, color, low }) {
 export default function HeadsUpDisplay({ onToggleMap, onTogglePause, onToggleMute, muted }) {
   const g = gameState;
   const start = startCashFor(g.difficulty);
-  const now = Math.round(g.cash * (g.purchasingPower / 100)); // real purchasing power
+  const now = Math.round(g.cash);
   const ppPct = Math.round(g.purchasingPower);
 
   const btcValue = Math.round(g.btc * g.btcPrice);
@@ -63,9 +63,11 @@ export default function HeadsUpDisplay({ onToggleMap, onTogglePause, onToggleMut
   const satsCheaper = gallon.sats < gallonStart.sats * 0.9;
 
   const nextStop = ROUTE.find((stop) => stop.mile > g.miles + 0.5);
-  const rangeMi = g.gas / CONFIG.GAS_PER_MILE;
+  const gasPerMile = CONFIG.GAS_PER_MILE * (g.pace === 'push' ? CONFIG.PUSH_GAS_MULT : 1);
+  const rangeMi = g.gas / gasPerMile;
   const gapMi = nextStop ? nextStop.mile - g.miles : 0;
   const shortOnFuel = Boolean(nextStop) && rangeMi + 1 < gapMi;
+  const nextGallon = nextStop && gapMi <= 40 ? gallonQuote(g.purchasingPower, g.btcPrice) : null;
 
   return (
     <>
@@ -106,6 +108,11 @@ export default function HeadsUpDisplay({ onToggleMap, onTogglePause, onToggleMut
         </div>
         {g.biome === 'sonora' && (
           <div style={{ ...s.rangeLine, color: '#e8b56a' }}>Sonora heat is in the metal</div>
+        )}
+        {nextGallon && (
+          <div style={{ ...s.rangeLine, color: '#f0c27a' }}>
+            {nextStop.name} gallon ${nextGallon.dollars.toLocaleString()} · {nextGallon.sats.toLocaleString()} sats
+          </div>
         )}
       </div>
 
@@ -155,6 +162,14 @@ export default function HeadsUpDisplay({ onToggleMap, onTogglePause, onToggleMut
         </button>
         <button style={s.ctrlBtn} onClick={onToggleMute} title="Sound" aria-label="Sound">
           <MuteIcon size={16} muted={muted} />
+        </button>
+        <button
+          style={{ ...s.ctrlBtn, color: g.pace === 'push' ? 'var(--btc)' : 'var(--paper)' }}
+          onClick={() => { gameState.pace = g.pace === 'push' ? 'cruise' : 'push'; }}
+          title="Cruise or push"
+          aria-label="Cruise or push"
+        >
+          {g.pace === 'push' ? 'PUSH' : 'CRUISE'}
         </button>
       </div>
 

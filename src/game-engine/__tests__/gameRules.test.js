@@ -30,6 +30,7 @@ function startPlaying(overrides = {}) {
     biome: 'california',
     currentCity: 'Los Angeles',
     currentCountry: 'USA',
+    pace: 'cruise',
     recentEventTitles: [],
     lastStopIndex: -1,
     enemiesDefeated: 0,
@@ -383,6 +384,26 @@ describe('BTC price random walk', () => {
     expect(gameState.btcPrice).toBeLessThan(66000);
     expect(gameState.btcPrice).toBeGreaterThan(1000);
     vi.restoreAllMocks();
+  });
+});
+
+describe('pace', () => {
+  it('push burns more gas than cruise over the same distance', () => {
+    startPlaying({ pace: 'cruise', gas: 100, miles: 0 });
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    tick(100 / CONFIG.MILES_PER_SECOND);
+    const cruiseGas = gameState.gas;
+    vi.restoreAllMocks();
+
+    startPlaying({ pace: 'push', gas: 100, miles: 0 });
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    tick(100 / CONFIG.PUSH_MILES_PER_SECOND);
+    const pushGas = gameState.gas;
+    vi.restoreAllMocks();
+
+    expect(gameState.miles).toBeGreaterThanOrEqual(99);
+    expect(pushGas).toBeLessThan(cruiseGas);
+    expect(cruiseGas).toBeCloseTo(100 - CONFIG.GAS_PER_MILE * 100, 4);
   });
 });
 

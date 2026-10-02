@@ -25,13 +25,15 @@ export const ROUTE = [
     lesson: 'Legal tender. The gallon is priced in the money that held.' },
 ];
 
+// earth paints the ground, plant the foliage, accent only that city's landmark
+// and a few matching props. mid stays equal to earth for older readers.
 export const BIOMES = {
-  california:  { mid: '#c9a66b', sky: '#7ec8e3', prop: 'sign' },
-  baja:        { mid: '#e0913f', sky: '#f2c14e', prop: 'cactus' },
-  sonora:      { mid: '#c1572e', sky: '#e8a04a', prop: 'cactus' },
-  central_mx:  { mid: '#7a9b6e', sky: '#9bb0bd', prop: 'building' },
-  s_mexico:    { mid: '#2f7d4f', sky: '#a7c4a0', prop: 'tree' },
-  guatemala:   { mid: '#2a5d3a', sky: '#8a9aa3', prop: 'volcano' },
-  honduras:    { mid: '#327a4d', sky: '#88b9a0', prop: 'palm' },
-  el_salvador: { mid: '#3a9b6a', sky: '#f2b65a', prop: 'palm' },
+  california:  { earth: '#c4a56a', plant: '#6d7a52', accent: '#f4f1ea', sky: '#7ec8e3', mid: '#c4a56a', prop: 'sign' },
+  baja:        { earth: '#c4b49a', plant: '#3e6b4a', accent: '#e2b13c', sky: '#d9c7a2', mid: '#c4b49a', prop: 'cactus' },
+  sonora:      { earth: '#c1572e', plant: '#8a9a4a', accent: '#f0e2b0', sky: '#f3e6cf', mid: '#c1572e', prop: 'cactus' },
+  central_mx:  { earth: '#8d8a84', plant: '#6e8a62', accent: '#7b4b9a', sky: '#9bb0bd', mid: '#8d8a84', prop: 'building' },
+  s_mexico:    { earth: '#3d6b45', plant: '#1f6b3a', accent: '#c45b8a', sky: '#a7c4a0', mid: '#3d6b45', prop: 'tree' },
+  guatemala:   { earth: '#2a241c', plant: '#1e4a30', accent: '#7eb6d6', sky: '#8a9aa3', mid: '#2a241c', prop: 'volcano' },
+  honduras:    { earth: '#6a6248', plant: '#2f5a3a', accent: '#f4f1ea', sky: '#7ea0c4', mid: '#6a6248', prop: 'pine' },
+  el_salvador: { earth: '#3a342e', plant: '#3a7a48', accent: '#1f6f93', sky: '#f2b65a', mid: '#3a342e', prop: 'palm' },
 };

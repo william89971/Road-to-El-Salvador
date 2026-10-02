@@ -45,6 +45,22 @@ export default function CityStopShop({ index, onContinue }) {
     bump((n) => n + 1);
   };
 
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+      if (!ready) {
+        if (e.key === 'Enter') setReady(true);
+        return;
+      }
+      if (e.key === '1') buy('refuel');
+      else if (e.key === '2') buy('repair');
+      else if (e.key === '3') buy('rest');
+      else if (e.key === 'Enter') onContinue();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
   const g = gameState;
   const next = ROUTE[index + 1];
   const gapMi = next ? next.mile - g.miles : 0;
@@ -55,6 +71,7 @@ export default function CityStopShop({ index, onContinue }) {
 
   return (
     <div style={st.wrap}>
+      <style>{`@media (max-width: 520px) { .shop-services { grid-template-columns: 1fr !important; } }`}</style>
       <div style={st.card}>
         {stop.dangerous && <div style={st.dangerBanner}>⚠ DANGEROUS REGION</div>}
         <div style={st.head}>
@@ -69,9 +86,10 @@ export default function CityStopShop({ index, onContinue }) {
         {stop.lesson && <p style={st.lesson}>{stop.lesson}</p>}
 
         {stop.isBorder && !ready ? (
-          <div style={st.borderBox}>
+          <div style={st.borderBox} onClick={() => setReady(true)} role="button" tabIndex={0}>
             <div style={st.borderTitle}>🛂 Waiting at the border…</div>
             <div style={st.waitTrack}><div style={st.waitFill} /></div>
+            <div style={st.borderHint}>Click or Enter to stamp through</div>
           </div>
         ) : (
           <>
@@ -86,7 +104,7 @@ export default function CityStopShop({ index, onContinue }) {
               </div>
             )}
 
-            <div style={st.services}>
+            <div style={st.services} className="shop-services">
               <Service
                 icon={<FuelIcon size={26} />} label="Refuel" detail={g.gas >= 100 ? 'Tank full' : 'Fill to 100%'}
                 price={refuelCost} sats={fuel.sats} disabled={g.gas >= 100 || g.cash < refuelCost}
@@ -158,8 +176,9 @@ const st = {
   satsBtn: { width: '100%', marginTop: 12, padding: '12px 10px', fontSize: 16, borderRadius: 10, background: 'transparent', color: 'var(--btc)', border: '1px solid var(--btc)' },
   continue: { width: '100%', marginTop: 18, padding: '14px', fontSize: 22, borderRadius: 12, background: 'var(--btc)', color: '#1a1411' },
   dangerHint: { textAlign: 'center', fontSize: 11.5, color: '#e08a7a', marginTop: 8 },
-  borderBox: { padding: '20px 0' },
+  borderBox: { padding: '20px 0', cursor: 'pointer' },
   borderTitle: { textAlign: 'center', fontFamily: 'var(--font-title)', fontSize: 22, marginBottom: 12 },
+  borderHint: { textAlign: 'center', fontSize: 12, color: '#b6a98c', marginTop: 10 },
   waitTrack: { height: 12, background: 'rgba(0,0,0,0.5)', borderRadius: 6, overflow: 'hidden' },
   waitFill: { height: '100%', background: 'linear-gradient(90deg, var(--cash), var(--btc))', animation: 'borderBar 1.5s linear forwards' },
 };

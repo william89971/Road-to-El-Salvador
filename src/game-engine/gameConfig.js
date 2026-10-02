@@ -12,7 +12,9 @@ const PP_END_RATIO = 0.25;
 
 export const CONFIG = {
   TOTAL_MILES,
-  MILES_PER_SECOND: 8,          // ~6 minutes of driving for the full route
+  MILES_PER_SECOND: 8,          // cruise. ~6 minutes for the full route
+  PUSH_MILES_PER_SECOND: 12,    // arrive sooner
+  PUSH_GAS_MULT: 1.5,           // and burn more fuel per mile
   TANK_RANGE_MILES: 1400,
   GAS_PER_MILE: 100 / 1400,
   SUV_WEAR_PER_MILE: 12 / TOTAL_MILES, // the rig ages; events do the real damage
