@@ -29,14 +29,25 @@ export function tick(dt) {
     100,
   );
 
-  // The stack appreciates with the miles. A small random walk keeps the sparkline alive.
-  const drifted = gameState.btcPrice * Math.exp(CONFIG.BTC_DRIFT_PER_MILE * gained);
-  if (Math.random() < dt * 0.5) {
-    gameState.btcPrice = Math.max(1000, Math.round(drifted + (Math.random() - 0.46) * 700));
+  // The stack appreciates with the miles. The number the player reads steps,
+  // so a 60fps drive does not spin the gallon price like a slot machine.
+  // A fresh run, a save, or a test writes btcPrice. Follow that, and keep the
+  // unrounded walk only while the printed number is still the one we published.
+  if (gameState.btcExact == null || gameState.btcPrice !== gameState.btcPrinted) {
+    gameState.btcExact = gameState.btcPrice;
+    gameState.btcPrinted = gameState.btcPrice;
+  }
+  gameState.btcExact *= Math.exp(CONFIG.BTC_DRIFT_PER_MILE * gained);
+  const walked = Math.random() < dt * 0.5;
+  if (walked) {
+    gameState.btcExact = Math.max(1000, gameState.btcExact + (Math.random() - 0.46) * 700);
+  }
+  const shown = Math.max(1000, Math.round(gameState.btcExact));
+  if (Math.abs(shown - gameState.btcPrice) >= 250) {
+    gameState.btcPrice = shown;
+    gameState.btcPrinted = shown;
     gameState.btcPriceHistory.push(gameState.btcPrice);
     if (gameState.btcPriceHistory.length > 60) gameState.btcPriceHistory.shift();
-  } else {
-    gameState.btcPrice = Math.max(1000, Math.round(drifted));
   }
 
   // loss conditions

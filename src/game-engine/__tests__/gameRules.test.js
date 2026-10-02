@@ -21,6 +21,8 @@ function startPlaying(overrides = {}) {
     cash: 800,
     btc: 0.05,
     btcPrice: 64000,
+    btcExact: 64000,
+    btcPrinted: 64000,
     btcPriceHistory: [64000],
     purchasingPower: 100,
     gameoverReason: '',
@@ -361,6 +363,16 @@ describe('BTC price random walk', () => {
     const lenBefore = gameState.btcPriceHistory.length;
     tick(2);
     expect(gameState.btcPriceHistory.length).toBeGreaterThan(lenBefore);
+    vi.restoreAllMocks();
+  });
+
+  it('holds the printed price still across a few frames', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const printed = gameState.btcPrice;
+    tick(1 / 60);
+    tick(1 / 60);
+    tick(1 / 60);
+    expect(gameState.btcPrice).toBe(printed);
     vi.restoreAllMocks();
   });
 

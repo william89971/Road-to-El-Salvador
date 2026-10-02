@@ -59,7 +59,8 @@ export default function HeadsUpDisplay({ onToggleMap, onTogglePause, onToggleMut
 
   const gallon = gallonQuote(g.purchasingPower, g.btcPrice);
   const gallonStart = gallonQuote(100, CONFIG.START_BTC_PRICE);
-  const satsCheaper = gallon.sats < gallonStart.sats;
+  // A one-sat dip is noise. Green means the coin has clearly outrun the dollar.
+  const satsCheaper = gallon.sats < gallonStart.sats * 0.9;
 
   const nextStop = ROUTE.find((stop) => stop.mile > g.miles + 0.5);
   const rangeMi = g.gas / CONFIG.GAS_PER_MILE;
@@ -103,6 +104,9 @@ export default function HeadsUpDisplay({ onToggleMap, onTogglePause, onToggleMut
             ? `Short ${Math.round(gapMi - rangeMi)} mi to ${nextStop.name}`
             : `Range ${Math.round(rangeMi)} mi${nextStop ? ` · ${nextStop.name} ${Math.round(gapMi)}` : ''}`}
         </div>
+        {g.biome === 'sonora' && (
+          <div style={{ ...s.rangeLine, color: '#e8b56a' }}>Sonora heat is in the metal</div>
+        )}
       </div>
 
       {/* top-right: HARD MONEY widget */}

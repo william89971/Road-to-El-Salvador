@@ -409,10 +409,12 @@ export class ParallaxScene {
     this._dustData = this.dust.userData.data;
     this.scene.add(this.dust);
 
-    this.rain = makeRain(160);
+    this.rain = makeRain(420);
     this.rain.visible = false;
     this.scene.add(this.rain);
     this._heatColor = new THREE.Color('#e8b56a');
+    this._rainColor = new THREE.Color('#6d7c88');
+    this._rainZenith = new THREE.Color('#243038');
   }
 
   _updateEnvironment(dt, s) {
@@ -420,8 +422,9 @@ export class ParallaxScene {
     const coast = s.biome === 'el_salvador';
     // fog density: jungle mist, desert heat haze, otherwise a long view
     const heat = s.biome === 'sonora';
-    const tn = jungle ? 35 : heat ? 22 : 80;
-    const tf = jungle ? 110 : heat ? 95 : 200;
+    const rain = s.biome === 'guatemala';
+    const tn = jungle ? 35 : heat ? 22 : rain ? 18 : 80;
+    const tf = jungle ? 110 : heat ? 95 : rain ? 90 : 200;
     this._fogNear += (tn - this._fogNear) * Math.min(1, dt * 1.5);
     this._fogFar += (tf - this._fogFar) * Math.min(1, dt * 1.5);
     this.scene.fog.near = this._fogNear; this.scene.fog.far = this._fogFar;
@@ -459,24 +462,32 @@ export class ParallaxScene {
     });
   }
 
+  _landmarkZ(i, s) {
+    const lm = this.landmarks[i];
+    let z = (ROUTE[i].mile - s.miles) * 1.25 + (lm.lead || 0);
+    // A city stop used to park the monument inside the camera. Hold it up the road.
+    if (s.paused && s.cityStopIndex === i) z = Math.max(z, 42);
+    return z;
+  }
+
   _updateLandmarks(dt, s) {
-    // nearest landmark in the approach window: ahead up to 200 miles, plus a
-    // short tail behind so it recedes past the camera (z<0) instead of being
-    // clamped onto the SUV at z=0.
-    let active = -1, activeRem = 0;
-    for (let i = 0; i < ROUTE.length; i++) {
-      const rem = ROUTE[i].mile - s.miles;
-      if (rem >= -16 && rem <= 200) { active = i; activeRem = rem; break; }
+    // Visibility follows the mesh, not the city mile. Hollywood is placed
+    // ahead of Los Angeles, so a mile window hid it while it was still in frame.
+    let active = -1;
+    let activeZ = Infinity;
+    for (let i = 0; i < this.landmarks.length; i++) {
+      const z = this._landmarkZ(i, s);
+      if (z < -20 || z > 260) continue;
+      if (z < activeZ) { activeZ = z; active = i; }
     }
     for (let i = 0; i < this.landmarks.length; i++) {
       const lm = this.landmarks[i];
       const on = i === active;
       lm.group.visible = on;
-      if (on) {
-        lm.group.position.set(lm.side, lm.baseY, activeRem * 1.25 + (lm.lead || 0));
-        if (lm.lava) updateParticleField(lm.lava, dt, true);
-        if (lm.smoke) updateParticleField(lm.smoke, dt, true);
-      }
+      if (!on) continue;
+      lm.group.position.set(lm.side, lm.baseY, activeZ);
+      if (lm.lava) updateParticleField(lm.lava, dt, true);
+      if (lm.smoke) updateParticleField(lm.smoke, dt, true);
     }
   }
 
@@ -743,6 +754,12 @@ export class ParallaxScene {
     this.skyUniforms.uZenith.value.copy(dn.zenC);
     this.skyUniforms.uHorizon.value.copy(dn.horC);
     this.scene.fog.color.copy(dn.horC);
+    if (s.biome === 'guatemala') {
+      this.scene.fog.color.lerp(this._rainColor, 0.62);
+      this.skyUniforms.uHorizon.value.lerp(this._rainColor, 0.5);
+      this.skyUniforms.uZenith.value.lerp(this._rainZenith, 0.55);
+      this.dirLight.intensity *= 0.45;
+    }
     if (s.biome === 'sonora') {
       this.scene.fog.color.lerp(this._heatColor, 0.55);
       // Shimmer in place. A running offset makes the desert slide sideways.
@@ -751,7 +768,7 @@ export class ParallaxScene {
     } else if (this.terrainMat.map) {
       this.terrainMat.map.offset.x = 0;
     }
-    this.renderer.setClearColor(dn.horC);
+    this.renderer.setClearColor(this.scene.fog.color);
     this.dome.position.copy(this.camera.position);
     this.stars.position.copy(this.camera.position);
 
@@ -879,9 +896,9 @@ function makeWordTexture(text, opts = {}) {
 
 // Rain sits in front of the fixed SUV. The world scrolls; the streaks do not.
 function makeRain(count) {
-  const geo = new THREE.PlaneGeometry(0.035, 1.5);
+  const geo = new THREE.PlaneGeometry(0.045, 2.8);
   const mat = new THREE.MeshBasicMaterial({
-    color: 0xd5e4ee, transparent: true, opacity: 0.42, depthWrite: false, fog: false, side: THREE.DoubleSide,
+    color: 0xe7eef3, transparent: true, opacity: 0.55, depthWrite: false, fog: false, side: THREE.DoubleSide,
   });
   const mesh = new THREE.InstancedMesh(geo, mat, count);
   mesh.frustumCulled = false;

@@ -26,6 +26,8 @@ export const gameState = {
   btc: 0.05,
 
   btcPrice: 64000,
+  btcExact: 64000,          // unrounded walk; the HUD prints btcPrice in steps
+  btcPrinted: 64000,        // last price this walk published
   btcPriceHistory: [64000], // last 60 values, for sparkline
   purchasingPower: 100,     // 100 -> shrinks toward 1
 
@@ -49,7 +51,8 @@ export function resetGame(name, difficulty, loadout, suvColor = '#7a8c6e') {
     biome: 'california', timeOfDay: 0.35,
     gas: lo.gas, suvHealth: 100, vibes: 5,
     cash, startCash: cash, btc: lo.btc, startBtc: lo.btc,
-    btcPrice: CONFIG.START_BTC_PRICE, btcPriceHistory: [CONFIG.START_BTC_PRICE],
+    btcPrice: CONFIG.START_BTC_PRICE, btcExact: CONFIG.START_BTC_PRICE, btcPrinted: CONFIG.START_BTC_PRICE,
+    btcPriceHistory: [CONFIG.START_BTC_PRICE],
     purchasingPower: 100, recentEventTitles: [], lastStopIndex: -1, cityStopIndex: -1,
     enemiesDefeated: 0, eventsSurvived: 0, gameoverReason: '',
     paidLastGallonInSats: false,
