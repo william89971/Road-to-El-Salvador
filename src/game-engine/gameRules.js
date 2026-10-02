@@ -19,7 +19,8 @@ export function tick(dt) {
   gameState.miles = clamp(before + CONFIG.MILES_PER_SECOND * dt, 0, CONFIG.TOTAL_MILES);
   const gained = gameState.miles - before;
   gameState.gas = clamp(gameState.gas - CONFIG.GAS_PER_MILE * gained, 0, 100);
-  gameState.suvHealth = clamp(gameState.suvHealth - CONFIG.SUV_WEAR_PER_MILE * gained, 0, 100);
+  const heat = gameState.biome === 'sonora' ? CONFIG.SONORA_HEAT_PER_MILE : 0;
+  gameState.suvHealth = clamp(gameState.suvHealth - (CONFIG.SUV_WEAR_PER_MILE + heat) * gained, 0, 100);
   gameState.timeOfDay = (gameState.timeOfDay + dt / 120) % 1; // 2-min day
   gameState.days = Math.floor(gameState.miles / 40);
   gameState.purchasingPower = clamp(
@@ -28,11 +29,14 @@ export function tick(dt) {
     100,
   );
 
-  // BTC random walk, upward drift, ~once per simulated day
+  // The stack appreciates with the miles. A small random walk keeps the sparkline alive.
+  const drifted = gameState.btcPrice * Math.exp(CONFIG.BTC_DRIFT_PER_MILE * gained);
   if (Math.random() < dt * 0.5) {
-    gameState.btcPrice = Math.max(1000, Math.round(gameState.btcPrice + (Math.random() - 0.46) * 1800));
+    gameState.btcPrice = Math.max(1000, Math.round(drifted + (Math.random() - 0.46) * 1800));
     gameState.btcPriceHistory.push(gameState.btcPrice);
     if (gameState.btcPriceHistory.length > 60) gameState.btcPriceHistory.shift();
+  } else {
+    gameState.btcPrice = Math.max(1000, Math.round(drifted));
   }
 
   // loss conditions

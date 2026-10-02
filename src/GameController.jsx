@@ -23,6 +23,7 @@ import {
 } from './game-engine/gameActions.js';
 import { createGameLoop } from './game-engine/gameLoop.js';
 import { saveRun } from './game-engine/leaderboardStorage.js';
+import { saveCheckpoint, loadCheckpoint, clearCheckpoint, restoreCheckpoint } from './game-engine/runSave.js';
 
 export default function GameController() {
   const canvasRef = useRef(null);
@@ -67,8 +68,7 @@ export default function GameController() {
           if (pendingStopRef.current !== index) return;
           pendingStopRef.current = null;
           setNameBanner(null);
-          setCurrentStop(index);
-          forceRender();
+          openCity(index);
         }, 2600);
       },
       onAudioReact: reactAudio,
@@ -148,8 +148,15 @@ export default function GameController() {
     audioRef.current = { histLen: 1, btc: CONFIG.START_BTC_PRICE, gasAlarm: false, suvAlarm: false, engine: audioRef.current.engine };
   };
 
+  const openCity = (index) => {
+    setCurrentStop(index);
+    saveCheckpoint();
+    forceRender();
+  };
+
   const handleStart = (name, difficulty, loadout, suvColor) => {
     audio.init();
+    clearCheckpoint();
     resetGame(name, difficulty, loadout, suvColor);
     setLastStopIndex(0); // already at LA (index 0)
     clearStop();
@@ -169,7 +176,25 @@ export default function GameController() {
     pendingStopRef.current = null;
     clearTimeout(bannerTimerRef.current);
     setNameBanner(null);
-    setCurrentStop(index);
+    openCity(index);
+  };
+
+  const handleContinue = () => {
+    const snap = loadCheckpoint();
+    if (!snap) return;
+    audio.init();
+    restoreCheckpoint(snap);
+    eventDataRef.current = null;
+    setEventData(null);
+    setShooter(null);
+    clearTimeout(bannerTimerRef.current);
+    pendingStopRef.current = null;
+    setNameBanner(null);
+    loopRef.current?.resetEventTimer();
+    if (gameState.cityStopIndex >= 0) setPaused(true);
+    resetAudioBookkeeping();
+    audioRef.current.histLen = gameState.btcPriceHistory.length;
+    audioRef.current.btc = gameState.btcPrice;
     forceRender();
   };
 
@@ -181,15 +206,18 @@ export default function GameController() {
       setShooter({ source: 'stop' }); // stays paused until the shooter resolves
     } else {
       setPaused(false);
+      saveCheckpoint();
     }
     forceRender();
   };
 
   const endShooter = () => {
+    const fromStop = shooter?.source === 'stop';
     // a "Stand your ground" event only counts as survived once the ambush resolves
     if (shooter?.source === 'event') incrementEventsSurvived();
     setShooter(null);
     setPaused(false);
+    if (fromStop) saveCheckpoint();
     forceRender();
   };
 
@@ -202,6 +230,7 @@ export default function GameController() {
   };
 
   const restart = () => {
+    clearCheckpoint();
     resetGame(gameState.playerName, gameState.difficulty, LOADOUTS[gameState.loadoutId], gameState.suvColor);
     setLastStopIndex(0);
     clearStop();
@@ -251,7 +280,7 @@ export default function GameController() {
       <canvas ref={canvasRef} style={styles.canvas} />
 
       {s.screen === 'start' && (
-        <StartScreen onStart={handleStart} onShowLeaderboard={() => setShowLeaderboard(true)} />
+        <StartScreen onStart={handleStart} onContinue={handleContinue} onShowLeaderboard={() => setShowLeaderboard(true)} />
       )}
 
       {s.screen === 'playing' && (
@@ -280,7 +309,7 @@ export default function GameController() {
       {s.screen === 'gameover' && <GameOverScreen onRestart={restart} onMenu={toMenu} />}
 
       {s.screen === 'arrival' && (
-        <ArrivalCinematic onDone={() => { setScreen('victory'); saveRun(); forceRender(); }} />
+        <ArrivalCinematic onDone={() => { clearCheckpoint(); setScreen('victory'); saveRun(); forceRender(); }} />
       )}
 
       {s.screen === 'victory' && (

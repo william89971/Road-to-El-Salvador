@@ -1,89 +1,89 @@
 import { DEV_MODE, gameState } from '../game-engine/gameStateAndRules.js';
 
 const MOCK_EVENTS = [
-  { headline: 'Radiator Blows in the Desert', dateline: 'HERMOSILLO HERALD — Day X',
+  { headline: 'Radiator Blows in the Desert', dateline: 'HERMOSILLO HERALD — Day X', biomes: ['baja', 'sonora'],
     description: 'Steam erupts from the hood at 108°F. A mechanic two miles back will help — for a price.',
     canFight: false,
     choices: [
-      { label: 'Pay the mechanic', consequence: 'Fixed, but it cost you.', effects: { cash: -120, suvHealth: 30 } },
-      { label: 'Patch it yourself', consequence: 'Holds for now. Barely.', effects: { suvHealth: 12, vibes: -1 } },
+      { label: 'Patch it yourself', consequence: 'Holds for now. The stack stays put.', effects: { suvHealth: 12, vibes: -1 } },
+      { label: 'Pay the mechanic', consequence: 'Fixed in dollars. The coin did not move.', effects: { cash: -80, suvHealth: 30 } },
     ] },
   { headline: 'Bitcoin Hits New All-Time High', dateline: 'CRYPTO WIRE — Day X',
     description: 'Your phone buzzes nonstop. The stack you almost sold in Tijuana is now worth a lot more.',
     canFight: false,
     choices: [
-      { label: 'HODL and keep driving', consequence: 'Diamond hands intact.', effects: { vibes: 1 } },
-      { label: 'Celebrate with tacos', consequence: 'Morale up, wallet down.', effects: { cash: -30, vibes: 1 } },
+      { label: 'HODL and keep driving', consequence: 'The stack stays. That was the whole point.', effects: { vibes: 1 } },
+      { label: 'Celebrate with tacos', consequence: 'A few dollars. Not a single sat.', effects: { cash: -25, vibes: 1 } },
     ] },
-  { headline: 'Bandits Block the Road', dateline: 'ROADSIDE REPORT — Day X',
-    description: 'Three figures step into the highway ahead, eyeing your plates. No way around them.',
+  { headline: 'Bandits Block the Road', dateline: 'ROADSIDE REPORT — Day X', biomes: ['guatemala', 'honduras'],
+    description: 'Three figures step into the highway ahead, eyeing your plates. They want the bag, not the keys.',
     canFight: true,
     choices: [
-      { label: 'Pay them off', consequence: 'They let you pass.', effects: { cash: -150 } },
-      { label: 'Turn back and detour', consequence: 'Safe, but slow and thirsty.', effects: { gas: -20, vibes: -1 } },
+      { label: 'Turn back and detour', consequence: 'Slower, thirstier, stack untouched.', effects: { gas: -15, vibes: -1 } },
+      { label: 'Pay them off', consequence: 'Dollars on the asphalt. The coin stays in the glovebox.', effects: { cash: -90 } },
     ] },
   { headline: 'The Fed Prints Again', dateline: 'FINANCIAL TIMES — Day X',
-    description: 'Another multi-trillion stimulus. Every dollar in your pocket just quietly lost value.',
+    description: 'Another multi-trillion stimulus. The cash in your pocket did not change. What it buys did.',
     canFight: false,
     choices: [
-      { label: 'Shrug and drive on', consequence: 'Your cash buys less now.', effects: { purchasingPower: -4 } },
-      { label: 'Stack more sats later', consequence: 'A plan, at least.', effects: { vibes: 1, purchasingPower: -2 } },
+      { label: 'Keep the stack', consequence: 'The printing does not touch the coin.', effects: { vibes: 1, purchasingPower: -2 } },
+      { label: 'Spend the cash while it works', consequence: 'A few dollars buy less than they did yesterday.', effects: { cash: -40, purchasingPower: -2 } },
     ] },
-  { headline: 'Night Mechanic in a Pemex Lot', dateline: 'BAJA BULLETIN — Day X',
-    description: 'A kid with a flashlight offers to top you off from a jerry can. He wants dollars, not a story.',
+  { headline: 'Night Mechanic in a Pemex Lot', dateline: 'BAJA BULLETIN — Day X', biomes: ['baja', 'sonora'],
+    description: 'A kid with a flashlight offers to top you off from a jerry can. He prices it in pesos.',
     canFight: false,
     choices: [
-      { label: 'Buy the gas', consequence: 'The needle climbs. So does his price.', effects: { gas: 30, cash: -45 } },
-      { label: 'Nurse what you have', consequence: 'You keep the cash and the worry.', effects: { vibes: -1 } },
+      { label: 'Nurse what you have', consequence: 'No sale. The worry stays, the stack stays.', effects: { vibes: -1 } },
+      { label: 'Buy the gas', consequence: 'The needle climbs. You paid the cheap money.', effects: { gas: 30, cash: -35 } },
     ] },
-  { headline: 'Checkpoint Wants a Look', dateline: 'FEDERAL HIGHWAY — Day X',
-    description: 'Flashlights in the window. They are curious about the laptop and the foreign plates.',
+  { headline: 'Checkpoint Wants a Look', dateline: 'FEDERAL HIGHWAY — Day X', biomes: ['guatemala'],
+    description: 'Flashlights in the window. They can stamp a passport. They do not get a seed phrase.',
     canFight: false,
     choices: [
-      { label: 'Pay the courtesy', consequence: 'The gate lifts. Your wallet does not.', effects: { cash: -60 } },
-      { label: 'Show the papers', consequence: 'An hour of questions. The engine idles hard.', effects: { gas: -8, vibes: -1 } },
+      { label: 'Show the papers', consequence: 'The stamp, not the keys. The engine idles.', effects: { gas: -8, vibes: -1 } },
+      { label: 'Pay the courtesy', consequence: 'The gate lifts. A few dollars, nothing else.', effects: { cash: -40 } },
     ] },
-  { headline: 'Hail Cracks the Windshield', dateline: 'SIERRA REPORT — Day X',
+  { headline: 'Hail Cracks the Windshield', dateline: 'SIERRA REPORT — Day X', biomes: ['s_mexico', 'guatemala'],
     description: 'A five-minute storm leaves a spiderweb across the glass. The wipers only make it worse.',
     canFight: false,
     choices: [
-      { label: 'Tape and drive', consequence: 'Ugly, but the road is still there.', effects: { suvHealth: -8, vibes: -1 } },
-      { label: 'Replace the glass', consequence: 'Clear view. Local prices.', effects: { cash: -90, suvHealth: 20 } },
+      { label: 'Tape and drive', consequence: 'Ugly, free, and the stack is still yours.', effects: { suvHealth: -8, vibes: -1 } },
+      { label: 'Replace the glass', consequence: 'Clear view, local dollars. The coin did not pay for it.', effects: { cash: -70, suvHealth: 20 } },
     ] },
   { headline: 'Cousin With a Coin', dateline: 'FAMILY CHAT — Day X',
     description: 'A voice note from home: "Sell a little, the dip looks real." The chart on your phone disagrees.',
     canFight: false,
     choices: [
-      { label: 'Sell a slice', consequence: 'Fiat in hand. Fewer sats forever.', effects: { btc: -0.005, cash: 80, vibes: -1 } },
-      { label: 'Leave it alone', consequence: 'The cousin is disappointed. The stack is not.', effects: { vibes: 1 } },
+      { label: 'Leave it alone', consequence: 'The cousin is disappointed. The scorecard is not.', effects: { vibes: 1 } },
+      { label: 'Sell a slice', consequence: 'Fiat in hand. Fewer sats forever. The card will show it.', effects: { btc: -0.005, cash: 80, vibes: -1 } },
     ] },
   { headline: 'Roadside Kitchen', dateline: 'COMEDOR MILE MARKER — Day X',
     description: 'Mole, tortillas, and a power outlet. The crew has not smiled since the last border.',
     canFight: false,
     choices: [
-      { label: 'Sit down and eat', consequence: 'An hour well spent.', effects: { cash: -25, vibes: 1 } },
-      { label: 'Keep rolling', consequence: 'Miles gained. Mood not.', effects: { vibes: -1 } },
+      { label: 'Keep rolling', consequence: 'Miles gained. The stack was never on the menu.', effects: { vibes: -1 } },
+      { label: 'Sit down and eat', consequence: 'Dinner in dollars. Not a sat on the table.', effects: { cash: -20, vibes: 1 } },
     ] },
-  { headline: 'Bridge Out Ahead', dateline: 'STATE POLICE — Day X',
+  { headline: 'Bridge Out Ahead', dateline: 'STATE POLICE — Day X', biomes: ['s_mexico', 'honduras'],
     description: 'A washed-out bridge. The detour is a dirt track that the SUV will feel in its bones.',
     canFight: false,
     choices: [
-      { label: 'Take the dirt track', consequence: 'You make it. The suspension remembers.', effects: { suvHealth: -18, gas: -12 } },
-      { label: 'Wait for the crew', consequence: 'They clear a lane by evening.', effects: { vibes: -1, gas: -6 } },
+      { label: 'Pay a crew to open a lane', consequence: 'Dollars move the gravel. The stack stays in the glovebox.', effects: { cash: -45 } },
+      { label: 'Take the dirt track', consequence: 'You make it. The suspension pays, not the stack.', effects: { suvHealth: -18, gas: -12 } },
     ] },
-  { headline: 'Someone Follows You Out of Town', dateline: 'NIGHT DRIVE — Day X',
-    description: 'The same headlights have sat two car-lengths back since the last Pemex. They match your speed.',
+  { headline: 'Someone Follows You Out of Town', dateline: 'NIGHT DRIVE — Day X', biomes: ['honduras'],
+    description: 'The same headlights have sat two car-lengths back since the last Pemex. They want what folds.',
     canFight: true,
     choices: [
-      { label: 'Lose them in town', consequence: 'Side streets and a racing pulse.', effects: { gas: -10, vibes: -1 } },
-      { label: 'Pull over and pay', consequence: 'They wanted the glovebox, not a fight.', effects: { cash: -80 } },
+      { label: 'Lose them in town', consequence: 'Side streets. The keys stay in your head.', effects: { gas: -10, vibes: -1 } },
+      { label: 'Pull over and pay', consequence: 'Dollars in the glovebox. The seed was never there.', effects: { cash: -60 } },
     ] },
-  { headline: 'Exchange Rate on a Napkin', dateline: 'CANTINA BLACKBOARD — Day X',
+  { headline: 'Exchange Rate on a Napkin', dateline: 'CANTINA BLACKBOARD — Day X', biomes: ['central_mx', 's_mexico'],
     description: 'The owner will swap pesos for a sliver of bitcoin, priced like he has somewhere to be.',
     canFight: false,
     choices: [
-      { label: 'Take the bad rate', consequence: 'Cash now. Sats gone.', effects: { btc: -0.004, cash: 70 } },
-      { label: 'Walk out', consequence: 'You keep the stack and the hunger.', effects: { vibes: -1 } },
+      { label: 'Walk out', consequence: 'You keep the stack. Hunger is cheaper than regret.', effects: { vibes: -1 } },
+      { label: 'Take the bad rate', consequence: 'Cash now. The scorecard loses the sats.', effects: { btc: -0.004, cash: 70 } },
     ] },
 ];
 
@@ -106,9 +106,15 @@ function buildSnapshot() {
   };
 }
 
+function eventsForBiome(biome) {
+  const local = MOCK_EVENTS.filter((e) => !e.biomes || e.biomes.includes(biome));
+  return local.length ? local : MOCK_EVENTS;
+}
+
 function pickMockEvent() {
-  const pool = MOCK_EVENTS.filter((e) => !gameState.recentEventTitles.includes(e.headline));
-  const source = pool.length ? pool : MOCK_EVENTS;
+  const here = eventsForBiome(gameState.biome);
+  const fresh = here.filter((e) => !gameState.recentEventTitles.includes(e.headline));
+  const source = fresh.length ? fresh : here;
   const e = source[Math.floor(Math.random() * source.length)];
   return { ...e, dateline: e.dateline.replace('Day X', `Day ${gameState.days}`) };
 }

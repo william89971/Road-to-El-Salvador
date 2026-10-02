@@ -408,13 +408,20 @@ export class ParallaxScene {
     this.dust.visible = false;
     this._dustData = this.dust.userData.data;
     this.scene.add(this.dust);
+
+    this.rain = makeRain(280);
+    this.rain.visible = false;
+    this.scene.add(this.rain);
+    this._heatColor = new THREE.Color('#e8b56a');
   }
 
   _updateEnvironment(dt, s) {
     const jungle = s.biome === 's_mexico';
     const coast = s.biome === 'el_salvador';
-    // fog density: tighter mist in the jungle
-    const tn = jungle ? 35 : 80, tf = jungle ? 110 : 200;
+    // fog density: jungle mist, desert heat haze, otherwise a long view
+    const heat = s.biome === 'sonora';
+    const tn = jungle ? 35 : heat ? 22 : 80;
+    const tf = jungle ? 110 : heat ? 95 : 200;
     this._fogNear += (tn - this._fogNear) * Math.min(1, dt * 1.5);
     this._fogFar += (tf - this._fogFar) * Math.min(1, dt * 1.5);
     this.scene.fog.near = this._fogNear; this.scene.fog.far = this._fogFar;
@@ -437,6 +444,9 @@ export class ParallaxScene {
       }
       pos.needsUpdate = true;
     }
+
+    this.rain.visible = s.biome === 'guatemala';
+    if (this.rain.visible) updateRain(this.rain, dt);
   }
 
   // ---- approaching city landmarks ----
@@ -519,6 +529,15 @@ export class ParallaxScene {
     return tile;
   }
 
+  _boardMat(biome) {
+    const text = sloganFor(biome);
+    if (!this._boardMats) this._boardMats = {};
+    if (!this._boardMats[text]) {
+      this._boardMats[text] = new THREE.MeshBasicMaterial({ map: makeWordTexture(text), toneMapped: false });
+    }
+    return this._boardMats[text];
+  }
+
   // build one region-specific prop for `biome`. `variant` (0..2, deterministic
   // per layout slot) gives variety within a biome.
   _propMesh(biome, variant) {
@@ -532,30 +551,36 @@ export class ParallaxScene {
       mesh.castShadow = true; mesh.receiveShadow = true;
       grp.add(mesh);
     };
+    if (variant === 2) {
+      add(g.billboardLeg, this.matDark, -1.5, 2.2, 0);
+      add(g.billboardLeg, this.matDark, 1.5, 2.2, 0);
+      const panel = new THREE.Mesh(g.billboardPanel, this._boardMat(biome));
+      panel.position.set(0, 4.3, 0);
+      grp.add(panel);
+      return grp;
+    }
+
     const palm = () => { add(g.palmTrunk, this.matTrunk, 0, 2.1, 0); for (let a = 0; a < 5; a++) add(g.leaf, this.matFoliage, 0, 4.1, 0, 0.2, (a / 5) * Math.PI * 2, 0.5); };
     const tree = (mat = this.matFoliage) => { add(g.trunk, this.matTrunk, 0, 1.3, 0); add(g.bush, mat, 0, 3.3, 0); };
     const rockCluster = () => { add(g.rock, this.matRock, 0, 0.5, 0, 0.2, 0.5, 0.1, 1.6, 1, 1.3); add(g.rock, this.matRock, 0.8, 0.35, 0.4, 0, 0.8, 0, 0.9, 0.7, 0.9); };
     const scrub = () => { for (let i = 0; i < 3; i++) add(g.scrub, this.matScrub, (i - 1) * 0.5, 0.4, (i % 2) * 0.4, 0, 0, 0, 1, 0.7, 1); };
 
     switch (biome) {
-      case 'california': // palms + highway signs + billboards
+      case 'california': // palms + highway signs; billboards are variant 2
         if (variant === 0) { add(g.palmTrunk, this.matTrunk, 0, 2.6, 0, 0, 0, 0, 1, 1.3, 1); add(g.palmCrown, this.matFoliage, 0, 5.4, 0, 0, 0, 0, 1.3, 1, 1.3); }
-        else if (variant === 1) { add(g.post, this.matDark, 0, 1.5, 0); add(g.board, this.matSign, 0, 2.9, 0); }
-        else { add(g.billboardLeg, this.matDark, -1.4, 2, 0); add(g.billboardLeg, this.matDark, 1.4, 2, 0); add(g.billboardPanel, this.matSign, 0, 4, 0); }
+        else { add(g.post, this.matDark, 0, 1.5, 0); add(g.board, this.matSign, 0, 2.9, 0); }
         break;
       case 'baja': // saguaro + rocky outcrops + scrub
         if (variant === 0) { add(g.saguaro, this.matCactus, 0, 2.6, 0); add(g.saguaroArm, this.matCactus, -0.45, 3, 0, 0, 0, 0.5); add(g.saguaroArm, this.matCactus, 0.45, 2.6, 0, 0, 0, -0.5); add(g.saguaroArm, this.matCactus, -0.45, 3.6, 0, Math.PI / 2, 0, 0); }
         else if (variant === 1) rockCluster();
         else scrub();
         break;
-      case 'sonora': // sparse scrub + rocks + dead trees
+      case 'sonora': // sparse scrub + rocks; the heat is the landmark
         if (variant === 0) scrub();
-        else if (variant === 1) rockCluster();
         else { add(g.deadTrunk, this.matDark, 0, 1.8, 0); add(g.branch, this.matDark, 0.3, 3, 0, 0, 0.6, 0.7); add(g.branch, this.matDark, -0.3, 2.6, 0, 0, -0.6, -0.7); }
         break;
-      case 'central_mx': // denser trees + power-line poles
-        if (variant === 2) { add(g.pole, this.matDark, 0, 3.2, 0); add(g.crossbar, this.matDark, 0, 5.8, 0); add(g.crossbar, this.matDark, 0, 5.2, 0); }
-        else tree(this.matFoliage);
+      case 'central_mx': // denser trees
+        tree(this.matFoliage);
         break;
       case 's_mexico': // dense jungle: layered canopy trees + vines
         add(g.trunk, this.matTrunk, 0, 1.6, 0, 0, 0, 0, 1, 1.4, 1);
@@ -567,9 +592,8 @@ export class ParallaxScene {
         if (variant === 1) rockCluster();
         else { tree(this.matFoliageDark); }
         break;
-      case 'honduras': // tropical palms + banana leaves (lush)
-        if (variant === 2) { add(g.trunk, this.matTrunk, 0, 0.9, 0, 0, 0, 0, 0.6, 0.6, 0.6); for (let a = 0; a < 5; a++) add(g.banana, this.matBanana, 0, 1.6, 0, -0.9, (a / 5) * Math.PI * 2, 0, 1.4, 1.4, 1.4); }
-        else palm();
+      case 'honduras': // tropical palms
+        palm();
         break;
       case 'el_salvador': // coastal palms
       default:
@@ -599,8 +623,9 @@ export class ParallaxScene {
         const variant = idx % 3;
         const prop = this._propMesh(biome, variant);
         prop.position.set(p.x, terrainHeight(p.x, p.z), p.z);
-        prop.rotation.y = (idx * 1.7) % (Math.PI * 2);
-        prop.scale.setScalar(p.s);
+        // Billboards face the driver. Everything else can sit at an angle.
+        prop.rotation.y = variant === 2 ? 0 : (idx * 1.7) % (Math.PI * 2);
+        prop.scale.setScalar(variant === 2 ? Math.max(p.s, 3) : p.s);
         props.add(prop);
       });
     }
@@ -697,6 +722,10 @@ export class ParallaxScene {
     this.skyUniforms.uZenith.value.copy(dn.zenC);
     this.skyUniforms.uHorizon.value.copy(dn.horC);
     this.scene.fog.color.copy(dn.horC);
+    if (s.biome === 'sonora') {
+      this.scene.fog.color.lerp(this._heatColor, 0.55);
+      if (this.terrainMat.map) this.terrainMat.map.offset.x = (this.terrainMat.map.offset.x + dt * 0.02) % 1;
+    }
     this.renderer.setClearColor(dn.horC);
     this.dome.position.copy(this.camera.position);
     this.stars.position.copy(this.camera.position);
@@ -789,6 +818,77 @@ function makeParticleField(count, color, size, additive, opacity = 0.7) {
   return pts;
 }
 
+function sloganFor(biome) {
+  if (biome === 'el_salvador') return 'LEGAL TENDER';
+  if (biome === 'guatemala' || biome === 'honduras') return 'NOT YOUR KEYS';
+  if (biome === 'central_mx' || biome === 's_mexico') return 'THERE IS NO SECOND BEST';
+  return 'INFLATION IS POLICY';
+}
+
+function makeWordTexture(text, opts = {}) {
+  const width = opts.width || 512;
+  const height = opts.height || 256;
+  const c = document.createElement('canvas');
+  c.width = width;
+  c.height = height;
+  const g = c.getContext('2d');
+  g.fillStyle = opts.bg || '#1a120c';
+  g.fillRect(0, 0, width, height);
+  g.strokeStyle = opts.fg || '#f7931a';
+  g.lineWidth = Math.max(8, Math.round(height * 0.04));
+  g.strokeRect(14, 14, width - 28, height - 28);
+  g.fillStyle = opts.fg || '#f7931a';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  let size = Math.floor(height * 0.42);
+  g.font = `bold ${size}px Georgia, serif`;
+  while (g.measureText(text).width > width * 0.86 && size > 16) {
+    size -= 2;
+    g.font = `bold ${size}px Georgia, serif`;
+  }
+  g.fillText(text, width / 2, height / 2 + size * 0.04);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+// Rain sits in front of the fixed SUV. The world scrolls; the streaks do not.
+function makeRain(count) {
+  const pos = new Float32Array(count * 3);
+  const data = [];
+  for (let i = 0; i < count; i++) {
+    const x = (Math.random() - 0.5) * 36;
+    const y = Math.random() * 26;
+    const z = -6 + Math.random() * 64;
+    data.push({ x, y, z, vy: 16 + Math.random() * 12 });
+    pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.PointsMaterial({
+    color: 0xd5e2ea, size: 0.16, transparent: true, opacity: 0.55, depthWrite: false, fog: false,
+  });
+  const pts = new THREE.Points(geo, mat);
+  pts.userData.data = data;
+  return pts;
+}
+
+function updateRain(field, dt) {
+  const data = field.userData.data;
+  const pos = field.geometry.attributes.position;
+  for (let i = 0; i < data.length; i++) {
+    const d = data[i];
+    d.y -= d.vy * dt;
+    if (d.y < 0) {
+      d.y = 18 + Math.random() * 8;
+      d.x = (Math.random() - 0.5) * 36;
+      d.z = -6 + Math.random() * 64;
+    }
+    pos.setXYZ(i, d.x, d.y, d.z);
+  }
+  pos.needsUpdate = true;
+}
+
 function updateParticleField(field, dt, rise) {
   const data = field.userData.data;
   const pos = field.geometry.attributes.position;
@@ -827,13 +927,21 @@ function buildLandmark(idx) {
   let side = 0, baseY = 0, lava = null, smoke = null;
 
   switch (idx) {
-    case 0: { // Los Angeles — Hollywood sign on a hill
+    case 0: { // Los Angeles — one painted Hollywood sign, readable on the approach
       side = -55; baseY = 0;
       const hill = M(0x6f5a3a);
-      add(new THREE.BoxGeometry(60, 18, 26), hill, 0, 7, 0, 0.12, 0, 0);
-      const white = M(0xeeeeea, { e: 0x222222, ei: 0.2 });
-      const letters = 'HOLLYWOOD';
-      for (let i = 0; i < letters.length; i++) add(new THREE.BoxGeometry(2.6, 7, 0.6), white, -22 + i * 5.5, 17, 12, -0.1, 0, 0);
+      add(new THREE.BoxGeometry(78, 24, 32), hill, 0, 9, 0, 0.12, 0, 0);
+      const sign = new THREE.Mesh(
+        new THREE.PlaneGeometry(62, 16),
+        new THREE.MeshBasicMaterial({
+          map: makeWordTexture('HOLLYWOOD', { bg: '#161311', fg: '#f4f1ea', width: 1024, height: 280 }),
+          toneMapped: false,
+        }),
+      );
+      sign.position.set(0, 26, 18);
+      sign.rotation.set(-0.12, 0.35, 0);
+      group.add(sign);
+      group.scale.setScalar(1.85);
       break;
     }
     case 1: { // Tijuana — arch gateway over the road (flag colors)
@@ -857,12 +965,13 @@ function buildLandmark(idx) {
     case 3: { // Mexico City — Angel of Independence column
       side = 30; baseY = 0;
       const stone = M(0xe6e0cf);
-      add(new THREE.BoxGeometry(8, 4, 8), stone, 0, 2, 0);
-      add(new THREE.CylinderGeometry(1.6, 2, 30, 12), stone, 0, 19, 0);
-      const gold = M(0xd4af37, { m: 0.6, e: 0x4a3a00, ei: 0.3 });
-      add(new THREE.BoxGeometry(2, 3, 1.4), gold, 0, 36, 0);
-      add(new THREE.BoxGeometry(0.3, 4, 2.6), gold, -1.4, 37, 0, 0, 0, 0.5);
-      add(new THREE.BoxGeometry(0.3, 4, 2.6), gold, 1.4, 37, 0, 0, 0, -0.5);
+      add(new THREE.BoxGeometry(10, 5, 10), stone, 0, 2.5, 0);
+      add(new THREE.CylinderGeometry(2.1, 2.8, 52, 12), stone, 0, 30, 0);
+      const gold = M(0xd4af37, { m: 0.6, e: 0x4a3a00, ei: 0.45 });
+      add(new THREE.BoxGeometry(2.4, 4, 1.6), gold, 0, 58, 0);
+      add(new THREE.BoxGeometry(0.35, 5, 3.2), gold, -1.6, 60, 0, 0, 0, 0.5);
+      add(new THREE.BoxGeometry(0.35, 5, 3.2), gold, 1.6, 60, 0, 0, 0, -0.5);
+      group.scale.setScalar(1.45);
       break;
     }
     case 4: { // Oaxaca — stepped pyramid
@@ -873,13 +982,14 @@ function buildLandmark(idx) {
     }
     case 5: { // Guatemala City — active volcano with lava glow
       side = -55; baseY = 0;
-      add(new THREE.ConeGeometry(34, 46, 24), M(0x2a2622), 0, 23, 0);
-      add(new THREE.ConeGeometry(6, 6, 16), M(0x3a1a10, { e: 0xff5a10, ei: 0.6 }), 0, 45, 0);
-      lava = makeParticleField(70, 0xff7a1a, 1.4, true, 0.85);
-      lava.position.set(0, 46, 0);
+      add(new THREE.ConeGeometry(40, 58, 24), M(0x2a2622), 0, 29, 0);
+      add(new THREE.ConeGeometry(9, 8, 16), M(0xff6a20, { e: 0xff3a00, ei: 2.4 }), 0, 58, 0);
+      lava = makeParticleField(90, 0xffb020, 1.8, true, 0.95);
+      lava.position.set(0, 60, 0);
       group.add(lava);
       smoke = makeParticleField(50, 0x555049, 2.2, false, 0.35);
-      smoke.position.set(0, 49, 0);
+      smoke.position.set(0, 64, 0);
+      group.scale.setScalar(1.35);
       group.add(smoke);
       break;
     }

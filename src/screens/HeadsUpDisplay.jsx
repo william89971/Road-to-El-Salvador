@@ -1,4 +1,5 @@
 import { gameState, CONFIG } from '../game-engine/gameStateAndRules.js';
+import { gallonQuote } from '../game-engine/money.js';
 import { ROUTE } from '../map-data/citiesAndRoute.js';
 import BitcoinPriceSparkline from './BitcoinPriceSparkline.jsx';
 import { FuelIcon, RigIcon, CrewIcon, CashIcon, BtcIcon, PauseIcon, PlayIcon, MuteIcon, MapIcon } from './Icons.jsx';
@@ -55,6 +56,10 @@ export default function HeadsUpDisplay({ onToggleMap, onTogglePause, onToggleMut
 
   const VIBES_MAX = 5;
   const vibesLow = g.vibes <= VIBES_MAX * 0.2; // red below 20%, derived from max
+
+  const gallon = gallonQuote(g.purchasingPower, g.btcPrice);
+  const gallonStart = gallonQuote(100, CONFIG.START_BTC_PRICE);
+  const satsCheaper = gallon.sats < gallonStart.sats;
 
   const nextStop = ROUTE.find((stop) => stop.mile > g.miles + 0.5);
   const rangeMi = g.gas / CONFIG.GAS_PER_MILE;
@@ -134,6 +139,9 @@ export default function HeadsUpDisplay({ onToggleMap, onTogglePause, onToggleMut
         <div style={s.spark}>
           <BitcoinPriceSparkline data={g.btcPriceHistory} width={188} height={34} />
         </div>
+        <div style={{ ...s.gallon, color: satsCheaper ? '#5ec27a' : '#d8c7a6' }}>
+          Gallon ${gallon.dollars.toLocaleString()} · {gallon.sats.toLocaleString()} sats
+        </div>
       </div>
 
       {/* top-center controls */}
@@ -200,6 +208,7 @@ const s = {
   ppFill: { height: '100%', background: 'var(--danger)', transition: 'width 0.3s linear' },
   sub: { fontSize: 10.5, color: '#b6a98c' },
   spark: { marginTop: 7, borderTop: '1px solid rgba(245,230,202,0.12)', paddingTop: 5 },
+  gallon: { marginTop: 4, fontSize: 11, textAlign: 'center', letterSpacing: '0.02em' },
 
   controls: { position: 'fixed', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 10, display: 'flex', gap: 8 },
   ctrlBtn: { ...panel, padding: '7px 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--paper)', cursor: 'pointer' },

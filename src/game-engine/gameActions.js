@@ -75,3 +75,7 @@ export function adjustPurchasingPower(delta) {
 export function adjustBTC(delta) {
   gameState.btc = clamp(gameState.btc + delta, 0, 99);
 }
+
+export function spendBtc(amount) {
+  gameState.btc = clamp(gameState.btc - amount, 0, 99);
+}

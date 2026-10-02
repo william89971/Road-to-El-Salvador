@@ -16,9 +16,13 @@ export const CONFIG = {
   TANK_RANGE_MILES: 1400,
   GAS_PER_MILE: 100 / 1400,
   SUV_WEAR_PER_MILE: 12 / TOTAL_MILES, // the rig ages; events do the real damage
+  SONORA_HEAT_PER_MILE: 0.04, // desert leg dents a healthy truck, it does not kill it
   START_CASH: 800,
   START_BTC: 0.05,
   START_BTC_PRICE: 64000,
+  // By the border the coin has outrun the dollar, so the same gallon costs fewer sats.
+  BTC_END_MULTIPLE: 5,
+  BTC_DRIFT_PER_MILE: Math.log(5) / TOTAL_MILES,
   PP_END_RATIO,
   PP_DECAY_PER_MILE: -Math.log(PP_END_RATIO) / TOTAL_MILES,
   EVENT_MIN_MS: 28000,

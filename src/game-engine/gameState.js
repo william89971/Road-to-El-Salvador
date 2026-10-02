@@ -34,6 +34,7 @@ export const gameState = {
   enemiesDefeated: 0,
   eventsSurvived: 0,
   gameoverReason: '',
+  paidLastGallonInSats: false,
 };
 
 export function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -51,6 +52,7 @@ export function resetGame(name, difficulty, loadout, suvColor = '#7a8c6e') {
     btcPrice: CONFIG.START_BTC_PRICE, btcPriceHistory: [CONFIG.START_BTC_PRICE],
     purchasingPower: 100, recentEventTitles: [], lastStopIndex: -1, cityStopIndex: -1,
     enemiesDefeated: 0, eventsSurvived: 0, gameoverReason: '',
+    paidLastGallonInSats: false,
   });
 }
 

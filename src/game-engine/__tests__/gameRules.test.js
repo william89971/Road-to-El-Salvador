@@ -3,6 +3,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { tick, applyEffects } from '../gameRules.js';
 import { gameState, resetGame, clamp, endGame } from '../gameState.js';
 import { CONFIG } from '../gameConfig.js';
+import { gallonQuote } from '../money.js';
+import { ROUTE } from '../../map-data/citiesAndRoute.js';
 
 // helper: reset state to a known playing state before each test
 function startPlaying(overrides = {}) {
@@ -368,6 +370,45 @@ describe('BTC price random walk', () => {
     // price change is capped to max 1800 range, won't exceed 64000+1800
     expect(gameState.btcPrice).toBeLessThan(66000);
     expect(gameState.btcPrice).toBeGreaterThan(1000);
+    vi.restoreAllMocks();
+  });
+});
+
+describe('Sonora heat', () => {
+  const desertMiles = 780; // Hermosillo → Mexico City
+
+  function drive(biome) {
+    startPlaying({ biome, suvHealth: 100, gas: 100, miles: 0 });
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    tick(desertMiles / CONFIG.MILES_PER_SECOND);
+    vi.restoreAllMocks();
+    return gameState.suvHealth;
+  }
+
+  it('wears the truck faster than California over the same distance', () => {
+    const california = drive('california');
+    const sonora = drive('sonora');
+    expect(sonora).toBeLessThan(california);
+  });
+
+  it('does not stop a full-health truck from finishing the desert leg', () => {
+    const health = drive('sonora');
+    expect(health).toBeGreaterThan(0);
+    expect(gameState.screen).toBe('playing');
+    expect(gameState.miles).toBeGreaterThanOrEqual(desertMiles - 0.05);
+  });
+});
+
+describe('the gallon by Guatemala', () => {
+  it('costs more dollars and fewer sats than it did in Los Angeles', () => {
+    startPlaying();
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const start = gallonQuote(100, CONFIG.START_BTC_PRICE);
+    const guatemala = ROUTE.find((c) => c.name === 'Guatemala City');
+    tick(guatemala.mile / CONFIG.MILES_PER_SECOND);
+    const now = gallonQuote(gameState.purchasingPower, gameState.btcPrice);
+    expect(now.dollars).toBeGreaterThan(start.dollars);
+    expect(now.sats).toBeLessThan(start.sats);
     vi.restoreAllMocks();
   });
 });

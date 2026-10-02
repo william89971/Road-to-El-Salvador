@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { createSUV } from '../game-engine/truckModel3D.js';
 import { LOADOUTS } from '../game-engine/gameStateAndRules.js';
+import { loadCheckpoint } from '../game-engine/runSave.js';
 import { CashIcon, BtcIcon, FuelIcon } from './Icons.jsx';
 
 const DIFFICULTIES = [
@@ -88,7 +89,8 @@ function StatBar({ label, value, pct, color }) {
   );
 }
 
-export default function StartScreen({ onStart, onShowLeaderboard }) {
+export default function StartScreen({ onStart, onContinue, onShowLeaderboard }) {
+  const [checkpoint] = useState(() => loadCheckpoint());
   const [name, setName] = useState('');
   const [difficulty, setDifficulty] = useState('road_warrior');
   const [suvColor, setSuvColor] = useState('#7a8c6e');
@@ -206,6 +208,12 @@ export default function StartScreen({ onStart, onShowLeaderboard }) {
 
         <button style={styles.start} onClick={start}>START THE ENGINE ▸</button>
 
+        {checkpoint && onContinue && (
+          <button style={styles.cont} onClick={onContinue}>
+            CONTINUE FROM {checkpoint.currentCity || 'THE ROAD'}
+          </button>
+        )}
+
         {onShowLeaderboard && (
           <button style={styles.lbBtn} onClick={onShowLeaderboard}>🏆 Leaderboard</button>
         )}
@@ -263,6 +271,10 @@ const styles = {
   start: {
     width: '100%', marginTop: 20, padding: '15px', fontSize: 26, borderRadius: 12,
     background: 'var(--btc)', color: '#1a1411', boxShadow: '0 8px 24px rgba(247,147,26,0.35)',
+  },
+  cont: {
+    width: '100%', marginTop: 10, padding: '12px', fontSize: 18, borderRadius: 10,
+    background: 'transparent', color: 'var(--btc)', border: '1px solid var(--btc)',
   },
   lbBtn: {
     width: '100%', marginTop: 10, padding: '11px', fontSize: 18, borderRadius: 10,
