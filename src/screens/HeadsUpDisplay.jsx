@@ -1,5 +1,6 @@
 import { gameState, CONFIG } from '../game-engine/gameStateAndRules.js';
 import { gallonQuote } from '../game-engine/money.js';
+import { calendarLabel, weatherFor } from '../game-engine/weather.js';
 import { ROUTE } from '../map-data/citiesAndRoute.js';
 import BitcoinPriceSparkline from './BitcoinPriceSparkline.jsx';
 import { FuelIcon, RigIcon, CrewIcon, CashIcon, BtcIcon, PauseIcon, PlayIcon, MuteIcon, MapIcon } from './Icons.jsx';
@@ -68,6 +69,7 @@ export default function HeadsUpDisplay({ onToggleMap, onTogglePause, onToggleMut
   const gapMi = nextStop ? nextStop.mile - g.miles : 0;
   const shortOnFuel = Boolean(nextStop) && rangeMi + 1 < gapMi;
   const nextGallon = nextStop && gapMi <= 40 ? gallonQuote(g.purchasingPower, g.btcPrice) : null;
+  const wx = weatherFor(g.biome, g.timeOfDay, g.days);
 
   return (
     <>
@@ -187,7 +189,7 @@ export default function HeadsUpDisplay({ onToggleMap, onTogglePause, onToggleMut
           <span style={s.progEnd}>🇸🇻</span>
         </div>
         <div style={s.progLabel}>
-          {Math.round(g.miles)} / {CONFIG.TOTAL_MILES} mi · {g.currentCity} · Day {g.days}
+          {Math.round(g.miles)} / {CONFIG.TOTAL_MILES} mi · {g.currentCity} · {calendarLabel(g.days)} · {wx.label}
         </div>
       </div>
     </>

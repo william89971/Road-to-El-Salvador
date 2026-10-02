@@ -3,6 +3,7 @@ import { gameState } from './gameStateAndRules.js';
 import { CONFIG } from './gameConfig.js';
 import { BIOMES, ROUTE } from '../map-data/citiesAndRoute.js';
 import { createSUV } from './truckModel3D.js';
+import { weatherFor } from './weather.js';
 
 // A true 3D driving scene: a perspective camera chases a fixed SUV while the
 // road, rolling terrain, props and mountains scroll toward it on a seamless
@@ -442,16 +443,16 @@ export class ParallaxScene {
     this._heatColor = new THREE.Color('#e8b56a');
     this._rainColor = new THREE.Color('#6d7c88');
     this._rainZenith = new THREE.Color('#243038');
+    this._marineColor = new THREE.Color('#c5d4de');
+    this._dustColor = new THREE.Color('#c4a574');
+    this._wetColor = new THREE.Color('#6e6e70');
+    this._wxFog = new THREE.Color('#c5d4de');
   }
 
-  _updateEnvironment(dt, s) {
-    const jungle = s.biome === 's_mexico';
+  _updateEnvironment(dt, s, wx) {
     const coast = s.biome === 'el_salvador';
-    // fog density: jungle mist, desert heat haze, otherwise a long view
-    const heat = s.biome === 'sonora';
-    const rain = s.biome === 'guatemala';
-    const tn = jungle ? 35 : heat ? 22 : rain ? 18 : 80;
-    const tf = jungle ? 110 : heat ? 95 : rain ? 90 : 200;
+    const tn = wx.fogNear;
+    const tf = wx.fogFar;
     this._fogNear += (tn - this._fogNear) * Math.min(1, dt * 1.5);
     this._fogFar += (tf - this._fogFar) * Math.min(1, dt * 1.5);
     this.scene.fog.near = this._fogNear; this.scene.fog.far = this._fogFar;
@@ -460,8 +461,8 @@ export class ParallaxScene {
     if (coast) this.ocean.material.color.set(0x1f6f93);
     this.urban.visible = s.biome === 'central_mx';
 
-    // dust devil swirl
-    this.dust.visible = s.biome === 'sonora';
+    this.dust.visible = wx.dust > 0.05;
+    if (this.dust.material) this.dust.material.opacity = 0.15 + 0.5 * wx.dust;
     if (this.dust.visible) {
       const pos = this.dust.geometry.attributes.position;
       for (let i = 0; i < this._dustData.length; i++) {
@@ -475,7 +476,8 @@ export class ParallaxScene {
       pos.needsUpdate = true;
     }
 
-    this.rain.visible = s.biome === 'guatemala';
+    this.rain.visible = wx.rain > 0.08;
+    if (this.rain.material) this.rain.material.opacity = 0.2 + 0.5 * wx.rain;
     if (this.rain.visible) updateRain(this.rain, dt);
   }
 
@@ -854,8 +856,6 @@ export class ParallaxScene {
     this.matAccent.color.copy(this.curAccent);
     this.hemi.color.copy(this.curSky);
     this.hemi.groundColor.copy(this.curMid);
-    this._roadTarget.set(s.biome === 'guatemala' ? '#6e6e70' : '#ffffff');
-    this.roadMat.color.lerp(this._roadTarget, Math.min(1, dt * 1.5));
 
     // seamless infinite scroll: two tiles leapfrog along Z as the world moves
     const scroll = s.miles * SCROLL;
@@ -880,12 +880,18 @@ export class ParallaxScene {
     this.camera.lookAt(0, 1.5 + hill * 0.15, 16);
     this._updateMileMarkers(s);
 
-    // biome environment extras + approaching landmarks
-    this._updateEnvironment(dt, s);
+    // Golden hour eases in on the coast and wins over a storm still falling behind.
+    this._golden += ((s.biome === 'el_salvador' ? 1 : 0) - this._golden) * Math.min(1, dt * 1.2);
+    const wx = weatherFor(s.biome, s.timeOfDay, s.days);
+    const calm = 1 - this._golden;
+    wx.rain *= wx.id === 'golden' ? 1 : calm;
+    wx.heat *= wx.id === 'golden' ? 1 : calm;
+    wx.wet *= wx.id === 'golden' ? 1 : calm;
+    this._wx = wx;
+
+    this._updateEnvironment(dt, s, wx);
     this._updateLandmarks(dt, s);
 
-    // ---- time of day (el_salvador eases to a locked golden hour) ----
-    this._golden += ((s.biome === 'el_salvador' ? 1 : 0) - this._golden) * Math.min(1, dt * 1.2);
     const tod = s.timeOfDay + (0.66 - s.timeOfDay) * this._golden;
     const dn = this._dayNight(tod);
 
@@ -903,21 +909,32 @@ export class ParallaxScene {
     // sky dome + fog/clear horizon blend
     this.skyUniforms.uZenith.value.copy(dn.zenC);
     this.skyUniforms.uHorizon.value.copy(dn.horC);
+    const wxNow = this._wx;
     this.scene.fog.color.copy(dn.horC);
-    if (s.biome === 'guatemala') {
-      this.scene.fog.color.lerp(this._rainColor, 0.62);
-      this.skyUniforms.uHorizon.value.lerp(this._rainColor, 0.5);
-      this.skyUniforms.uZenith.value.lerp(this._rainZenith, 0.55);
-      this.dirLight.intensity *= 0.45;
+    this._wxFog.set(wxNow.fogColor);
+    if (wxNow.rain > 0.05) {
+      this.scene.fog.color.lerp(this._rainColor, 0.62 * wxNow.rain);
+      this.skyUniforms.uHorizon.value.lerp(this._rainColor, 0.5 * wxNow.rain);
+      this.skyUniforms.uZenith.value.lerp(this._rainZenith, 0.55 * wxNow.rain);
+      this.dirLight.intensity *= 1 - 0.55 * Math.min(1, wxNow.rain);
+    } else if (wxNow.id === 'marine') {
+      this.scene.fog.color.lerp(this._marineColor, 0.45);
+      this.skyUniforms.uHorizon.value.lerp(this._marineColor, 0.35);
+    } else if (wxNow.id === 'dust') {
+      this.scene.fog.color.lerp(this._dustColor, 0.5);
+    } else if (wxNow.heat > 0.05) {
+      this.scene.fog.color.lerp(this._heatColor, 0.55 * wxNow.heat);
+    } else if (wxNow.id === 'golden') {
+      this.scene.fog.color.lerp(this._wxFog, 0.35);
     }
-    if (s.biome === 'sonora') {
-      this.scene.fog.color.lerp(this._heatColor, 0.55);
-      // Shimmer in place. A running offset makes the desert slide sideways.
+    if (wxNow.heat > 0.05) {
       this._heatT = (this._heatT || 0) + dt;
-      if (this.terrainMat.map) this.terrainMat.map.offset.x = Math.sin(this._heatT * 0.8) * 0.015;
+      if (this.terrainMat.map) this.terrainMat.map.offset.x = Math.sin(this._heatT * 0.8) * 0.015 * wxNow.heat;
     } else if (this.terrainMat.map) {
       this.terrainMat.map.offset.x = 0;
     }
+    this._roadTarget.set('#ffffff').lerp(this._wetColor, wxNow.wet);
+    this.roadMat.color.lerp(this._roadTarget, Math.min(1, dt * 1.5));
     this.renderer.setClearColor(this.scene.fog.color);
     this.dome.position.copy(this.camera.position);
     this.stars.position.copy(this.camera.position);
